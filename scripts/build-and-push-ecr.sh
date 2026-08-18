@@ -2,13 +2,12 @@
 
 # Builds the Outline base and application images and pushes them to ECR.
 #
-# Credentials come from an EC2 instance role or a named AWS profile. See
-# scripts/lib/aws.sh for the resolution order.
+# Credentials come from the ambient chain by default, so an EC2 instance role
+# works with no configuration. Set AWS_PROFILE to use a named profile instead.
 #
 # Usage:
 #   ./scripts/build-and-push-ecr.sh [image-tag]
 #   AWS_PROFILE=internal-tools ./scripts/build-and-push-ecr.sh v1.2.3
-#   AWS_PROFILE= ./scripts/build-and-push-ecr.sh   # force the instance role
 #   DOCKER_PLATFORM=linux/arm64 ./scripts/build-and-push-ecr.sh
 
 set -euo pipefail

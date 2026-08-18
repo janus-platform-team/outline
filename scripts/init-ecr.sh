@@ -2,13 +2,12 @@
 
 # Creates the ECR repositories used by the Outline images.
 #
-# Credentials come from an EC2 instance role or a named AWS profile. See
-# scripts/lib/aws.sh for the resolution order.
+# Credentials come from the ambient chain by default, so an EC2 instance role
+# works with no configuration. Set AWS_PROFILE to use a named profile instead.
 #
 # Usage:
-#   ./scripts/init-ecr.sh                    # instance role, or the default profile
-#   AWS_PROFILE=internal-tools ./scripts/init-ecr.sh
-#   AWS_PROFILE= ./scripts/init-ecr.sh       # force the instance role
+#   ./scripts/init-ecr.sh                             # instance role or environment
+#   AWS_PROFILE=internal-tools ./scripts/init-ecr.sh  # named profile
 #   AWS_REGION=us-west-2 ./scripts/init-ecr.sh
 
 set -euo pipefail
