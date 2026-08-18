@@ -1,0 +1,6 @@
+{
+  "id": "aws-saml",
+  "name": "AWS IAM Identity Center",
+  "priority": 15,
+  "description": "Adds an AWS IAM Identity Center (SAML 2.0) authentication provider."
+}
