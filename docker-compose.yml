@@ -1,19 +1,10 @@
 services:
   outline:
-    image: "${ECR_REGISTRY:-ecr-registry-not-configured}/outline:${IMAGE_TAG:-latest}"
-    profiles: ["ecr"]
-    pull_policy: always
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      DATABASE_URL: postgres://user:${POSTGRES_PASSWORD:-pass}@postgres:5432/outline
-      REDIS_URL: redis://:${REDIS_PASSWORD:-outline}@redis:6379
+    image: "457090734503.dkr.ecr.us-east-1.amazonaws.com/outline:latest"
+    env_file: .env
     ports:
       - "3000:3000"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
@@ -21,45 +12,36 @@ services:
 
   redis:
     image: redis
-    # Redis has no authentication by default and listens on every interface in
-    # the container, so anything able to reach the port has full read/write
-    # access to sessions, queued jobs, and cached auth tokens. Override
-    # REDIS_PASSWORD outside of local development.
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-outline}"]
+    env_file: .env
     ports:
-      - "127.0.0.1:6379:6379"
+      - "6379:6379"
+    volumes:
+      - ./redis.conf:/redis.conf
+    command: ["redis-server", "/redis.conf"]
     user: "redis:redis"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "redis-cli",
-          "-a",
-          "${REDIS_PASSWORD:-outline}",
-          "--no-auth-warning",
-          "ping",
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
 
-  postgres:
-    image: postgres
+  https-portal:
+    image: steveltn/https-portal
+    env_file: ./.env
     ports:
-      - "127.0.0.1:5432:5432"
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
-      POSTGRES_DB: outline
-    user: "postgres:postgres"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d outline"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      - '80:80'
+      - '443:443'
+    links:
+      - outline
+    restart: always
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - https-portal-data:/var/lib/https-portal
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
 volumes:
   outline-data:
-  postgres-data:
+  https-portal-data:
