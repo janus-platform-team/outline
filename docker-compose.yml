@@ -7,8 +7,8 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgres://user:pass@postgres:5432/outline
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgres://user:${POSTGRES_PASSWORD:-pass}@postgres:5432/outline
+      REDIS_URL: redis://:${REDIS_PASSWORD:-outline}@redis:6379
     ports:
       - "3000:3000"
     depends_on:
@@ -21,11 +21,24 @@ services:
 
   redis:
     image: redis
+    # Redis has no authentication by default and listens on every interface in
+    # the container, so anything able to reach the port has full read/write
+    # access to sessions, queued jobs, and cached auth tokens. Override
+    # REDIS_PASSWORD outside of local development.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-outline}"]
     ports:
       - "127.0.0.1:6379:6379"
     user: "redis:redis"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${REDIS_PASSWORD:-outline}",
+          "--no-auth-warning",
+          "ping",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -36,7 +49,7 @@ services:
       - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
       POSTGRES_DB: outline
     user: "postgres:postgres"
     healthcheck:
