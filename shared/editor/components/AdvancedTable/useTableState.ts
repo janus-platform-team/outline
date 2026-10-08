@@ -1,27 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MaxDataLength, tableDataLength } from "../../lib/advancedTable";
 import type { AdvancedTableData } from "../../lib/advancedTable";
 
 const CommitInterval = 300;
 
 /**
  * Keeps a local draft of the table so edits render immediately, while writing
- * changes back to the document at most once per commit interval.
+ * changes back to the document at most once per commit interval. Edits that
+ * would grow the table beyond the size limit are rejected.
  *
  * @param data the table data stored in the document.
  * @param onChange callback that writes data to the document.
+ * @param onLimitExceeded callback invoked when an edit is rejected for size.
  * @returns the current draft, an update function and a flush function.
  */
 export function useTableState(
   data: AdvancedTableData,
-  onChange: (data: AdvancedTableData) => void
+  onChange: (data: AdvancedTableData) => void,
+  onLimitExceeded?: () => void
 ) {
   const [draft, setDraft] = useState(data);
   const draftRef = useRef(data);
+  const draftLengthRef = useRef<number | null>(null);
   const lastSyncedRef = useRef(data);
   const pendingRef = useRef<AdvancedTableData | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onLimitExceededRef = useRef(onLimitExceeded);
+  onLimitExceededRef.current = onLimitExceeded;
 
   const flush = useCallback(() => {
     if (timerRef.current) {
@@ -46,7 +53,20 @@ export function useTableState(
       if (next === draftRef.current) {
         return;
       }
+
+      const nextLength = tableDataLength(next);
+      if (nextLength > MaxDataLength) {
+        const currentLength =
+          draftLengthRef.current ?? tableDataLength(draftRef.current);
+        // Still allow edits that shrink a table that is already too large.
+        if (nextLength >= currentLength) {
+          onLimitExceededRef.current?.();
+          return;
+        }
+      }
+
       draftRef.current = next;
+      draftLengthRef.current = nextLength;
       pendingRef.current = next;
       setDraft(next);
 
@@ -71,6 +91,7 @@ export function useTableState(
       return;
     }
     draftRef.current = data;
+    draftLengthRef.current = null;
     setDraft(data);
   }, [data]);
 

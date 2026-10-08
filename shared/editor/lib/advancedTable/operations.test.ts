@@ -6,6 +6,7 @@ import {
   createEmptyTable,
   deleteColumn,
   deleteRows,
+  fitTableToLength,
   moveColumn,
   normalizeTableData,
   parseTableData,
@@ -13,6 +14,7 @@ import {
   setCell,
   setColumnWidth,
   setSort,
+  tableDataLength,
   tableToPlainText,
   updateColumn,
 } from "./operations";
@@ -204,5 +206,29 @@ describe("tableToPlainText", () => {
     data = setCell(data, data.rows[0].id, b.id, "two");
     data = updateColumn(data, b.id, { hidden: true });
     expect(tableToPlainText(data)).toBe(`${a.name}\none`);
+  });
+});
+
+describe("fitTableToLength", () => {
+  it("keeps tables that already fit", () => {
+    const data = createEmptyTable(2, 5);
+    const result = fitTableToLength(data, tableDataLength(data));
+    expect(result.truncated).toBe(false);
+    expect(result.data).toBe(data);
+  });
+
+  it("drops trailing rows until the serialized length fits", () => {
+    const data = createEmptyTable(2, 10);
+    const maxLength = tableDataLength(data) - 1;
+    const result = fitTableToLength(data, maxLength);
+    expect(result.truncated).toBe(true);
+    expect(result.data.rows).toEqual(data.rows.slice(0, 9));
+    expect(tableDataLength(result.data)).toBeLessThanOrEqual(maxLength);
+  });
+
+  it("measures exactly at the boundary", () => {
+    const data = createEmptyTable(2, 10);
+    const fitsNine = tableDataLength({ ...data, rows: data.rows.slice(0, 9) });
+    expect(fitTableToLength(data, fitsNine).data.rows).toHaveLength(9);
   });
 });

@@ -4,6 +4,7 @@ import {
   DefaultColumnWidth,
   MaxColumns,
   MaxColumnWidth,
+  MaxDataLength,
   MaxRows,
   MinColumnWidth,
 } from "./types";
@@ -592,6 +593,46 @@ export function tableToPlainText(data: AdvancedTableData): string {
     );
   }
   return lines.join("\n");
+}
+
+/**
+ * Measures the serialized length of table data as it is stored in the document.
+ *
+ * @param data the table data.
+ * @returns the length of the JSON representation.
+ */
+export function tableDataLength(data: AdvancedTableData): number {
+  return JSON.stringify(data).length;
+}
+
+/**
+ * Drops rows from the end of the table until its serialized length fits.
+ *
+ * @param data the table data.
+ * @param maxLength the maximum serialized length.
+ * @returns the table that fits and whether rows were dropped.
+ */
+export function fitTableToLength(
+  data: AdvancedTableData,
+  maxLength = MaxDataLength
+): { data: AdvancedTableData; truncated: boolean } {
+  let length = tableDataLength({ ...data, rows: [] });
+  let count = 0;
+  for (const row of data.rows) {
+    // Each row after the first is preceded by a comma.
+    length += JSON.stringify(row).length + (count ? 1 : 0);
+    if (length > maxLength) {
+      break;
+    }
+    count++;
+  }
+  if (count === data.rows.length) {
+    return { data, truncated: false };
+  }
+  return {
+    data: { ...data, rows: data.rows.slice(0, count) },
+    truncated: true,
+  };
 }
 
 const collator = new Intl.Collator(undefined, {

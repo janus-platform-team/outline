@@ -2,7 +2,11 @@ import ReactDOM from "react-dom";
 import { act } from "react-dom/test-utils";
 import { ThemeProvider } from "styled-components";
 import { buildLightTheme } from "../../../styles/theme";
-import { createEmptyTable } from "../../lib/advancedTable";
+import {
+  createEmptyTable,
+  MaxDataLength,
+  tableDataLength,
+} from "../../lib/advancedTable";
 import type { AdvancedTableData } from "../../lib/advancedTable";
 import { AdvancedTableGrid } from "./Grid";
 
@@ -121,5 +125,27 @@ describeDom("AdvancedTableGrid", () => {
       container.querySelectorAll('[role="gridcell"][aria-selected="true"]')
     ).toHaveLength(1);
     vi.useRealTimers();
+  });
+
+  it("rejects edits that would exceed the size limit", () => {
+    const data = createEmptyTable(1, 1);
+    const columnId = data.columns[0].id;
+    data.rows[0].cells[columnId] = "x".repeat(
+      MaxDataLength - tableDataLength(data) - 10
+    );
+    const onChange = renderGrid(data);
+    const addRow = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Row"
+    );
+
+    act(() => {
+      addRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(container.querySelectorAll('[role="row"]')).toHaveLength(2);
+    expect(container.textContent).toContain(
+      "The table has reached its maximum size"
+    );
   });
 });

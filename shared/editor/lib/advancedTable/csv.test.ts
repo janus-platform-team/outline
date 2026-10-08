@@ -5,7 +5,8 @@ import {
   tableToCsv,
   toCsv,
 } from "./csv";
-import { MaxRows } from "./types";
+import { tableDataLength } from "./operations";
+import { MaxDataLength, MaxRows } from "./types";
 
 describe("parseCsv", () => {
   it("parses quoted fields with commas, quotes and newlines", () => {
@@ -92,6 +93,16 @@ describe("tableFromCsv", () => {
     const { data, truncated } = tableFromCsv(lines.join("\n"));
     expect(truncated).toBe(true);
     expect(data.rows).toHaveLength(MaxRows);
+  });
+
+  it("truncates rows that would exceed the size limit", () => {
+    const value = "x".repeat(500);
+    const lines = ["a,b", ...Array.from({ length: 2000 }, () => `${value},1`)];
+    const { data, truncated } = tableFromCsv(lines.join("\n"));
+    expect(truncated).toBe(true);
+    expect(data.rows.length).toBeGreaterThan(0);
+    expect(data.rows.length).toBeLessThan(2000);
+    expect(tableDataLength(data)).toBeLessThanOrEqual(MaxDataLength);
   });
 });
 

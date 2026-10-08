@@ -65,6 +65,14 @@ export const MaxRows = 10000;
 /** Hard limit on the number of columns stored in a single table. */
 export const MaxColumns = 200;
 
+/**
+ * Limit on the serialized JSON length of a table. The whole table is stored in
+ * a single node attribute that is resent on every edit, so it must stay well
+ * below the collaboration server's document state limit or the document can no
+ * longer sync.
+ */
+export const MaxDataLength = 512 * 1024;
+
 export const DefaultColumnWidth = 160;
 
 export const MinColumnWidth = 60;

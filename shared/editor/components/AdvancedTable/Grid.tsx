@@ -126,7 +126,16 @@ function AdvancedTableGridComponent({
   onRedo,
 }: AdvancedTableGridProps) {
   const { t } = useTranslation();
-  const { draft, update, flush } = useTableState(data, onChange);
+  const [notice, setNotice] = React.useState<string | null>(null);
+  const handleLimitExceeded = React.useCallback(
+    () => setNotice(t("The table has reached its maximum size")),
+    [t]
+  );
+  const { draft, update, flush } = useTableState(
+    data,
+    onChange,
+    handleLimitExceeded
+  );
 
   const wrapperRef = React.useRef<HTMLDivElement>(null);
   const scrollerRef = React.useRef<HTMLDivElement>(null);
@@ -153,7 +162,6 @@ function AdvancedTableGridComponent({
   const [menu, setMenu] = React.useState<PopoverState | null>(null);
   const [filterMenu, setFilterMenu] = React.useState<PopoverState | null>(null);
   const [dropX, setDropX] = React.useState<number | null>(null);
-  const [notice, setNotice] = React.useState<string | null>(null);
   const selectionAnchorRef = React.useRef<number | null>(null);
 
   // Layout of visible columns, pinned columns are grouped at either side.
@@ -702,7 +710,7 @@ function AdvancedTableGridComponent({
       setNotice(
         result.truncated
           ? t("Only the first {{ count }} rows were imported", {
-              count: MaxRows,
+              count: result.data.rows.length,
             })
           : t("Imported {{ count }} rows", { count: result.data.rows.length })
       );

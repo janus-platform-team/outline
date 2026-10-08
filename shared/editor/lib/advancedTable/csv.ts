@@ -1,6 +1,7 @@
 import {
   coerceValue,
   createId,
+  fitTableToLength,
   formatValue,
   normalizeTableData,
 } from "./operations";
@@ -15,7 +16,7 @@ import type {
 export interface CsvImportResult {
   /** The imported table. */
   data: AdvancedTableData;
-  /** Whether rows beyond the row limit were dropped. */
+  /** Whether rows beyond the row or size limit were dropped. */
   truncated: boolean;
 }
 
@@ -148,9 +149,12 @@ export function tableFromCsv(
     return { id: createId(), cells };
   });
 
+  const fitted = fitTableToLength(
+    normalizeTableData({ version: 1, columns, rows, sort: [] })
+  );
   return {
-    data: normalizeTableData({ version: 1, columns, rows, sort: [] }),
-    truncated,
+    data: fitted.data,
+    truncated: truncated || fitted.truncated,
   };
 }
 
