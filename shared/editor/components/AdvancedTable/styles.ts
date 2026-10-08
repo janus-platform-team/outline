@@ -127,7 +127,7 @@ export const CellText = styled.span`
 export const HeaderBox = styled(CellBox)`
   position: relative;
   gap: 4px;
-  padding-right: 4px;
+  padding-right: 10px;
   font-weight: 500;
   background-color: ${s("backgroundSecondary")};
   color: ${s("textSecondary")};
@@ -151,15 +151,24 @@ export const HeaderLabel = styled.span`
 export const ResizeHandle = styled.div<{ $active: boolean }>`
   position: absolute;
   top: 0;
-  right: -3px;
-  width: 6px;
+  right: 0;
+  width: 8px;
   height: 100%;
   cursor: col-resize;
   z-index: 2;
-  background: ${(props) =>
-    props.$active ? props.theme.accent : "transparent"};
 
-  &:hover {
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 3px;
+    height: 100%;
+    background: ${(props) =>
+      props.$active ? props.theme.accent : "transparent"};
+  }
+
+  &:hover::after {
     background: ${s("accent")};
   }
 `;

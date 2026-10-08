@@ -4,11 +4,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import type {
-  ColumnDef,
-  ColumnSizingState,
-  SortingState,
-} from "@tanstack/react-table";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BackIcon, NextIcon } from "outline-icons";
 import * as React from "react";
@@ -143,7 +139,12 @@ function AdvancedTableGridComponent({
   const [localSort, setLocalSort] = React.useState<AdvancedTableSort[] | null>(
     null
   );
-  const [liveWidths, setLiveWidths] = React.useState<ColumnSizingState>({});
+  const [liveWidths, setLiveWidths] = React.useState<Record<string, number>>(
+    {}
+  );
+  const [resizingColumn, setResizingColumn] = React.useState<string | null>(
+    null
+  );
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
   const [active, setActive] = React.useState<CellPosition | null>(null);
   const [editing, setEditing] = React.useState<EditingState | null>(null);
@@ -206,9 +207,6 @@ function AdvancedTableGridComponent({
       draft.columns.map((column) => ({
         id: column.id,
         accessorFn: (row) => row.cells[column.id] ?? undefined,
-        size: column.width,
-        minSize: MinColumnWidth,
-        maxSize: MaxColumnWidth,
         sortUndefined: "last",
         sortingFn: (a, b) =>
           compareValues(
@@ -234,7 +232,6 @@ function AdvancedTableGridComponent({
     columns: columnDefs,
     state: {
       sorting,
-      columnSizing: liveWidths,
       pagination: { pageIndex, pageSize: PageSize },
     },
     getRowId: (row) => row.id,
@@ -244,13 +241,10 @@ function AdvancedTableGridComponent({
     manualPagination: !paginate,
     autoResetPageIndex: false,
     enableMultiSort: true,
-    columnResizeMode: "onChange",
-    onColumnSizingChange: setLiveWidths,
   });
 
   const rows = table.getRowModel().rows;
   const pageCount = paginate ? Math.max(1, table.getPageCount()) : 1;
-  const resizingColumn = table.getState().columnSizingInfo.isResizingColumn;
   const hasFilters = Object.values(filters).some(isFilterActive);
 
   const latest = React.useRef({ rows, layout, active, editing, draft });
@@ -261,24 +255,6 @@ function AdvancedTableGridComponent({
       setPageIndex(pageCount - 1);
     }
   }, [pageIndex, pageCount]);
-
-  // Persist column widths once a resize gesture completes.
-  React.useEffect(() => {
-    if (resizingColumn || !Object.keys(liveWidths).length) {
-      return;
-    }
-    const widths = liveWidths;
-    update(
-      (current) =>
-        Object.entries(widths).reduce(
-          (acc, [id, width]) => setColumnWidth(acc, id, width),
-          current
-        ),
-      { immediate: true }
-    );
-    setLiveWidths({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resizingColumn]);
 
   React.useEffect(() => {
     if (!notice) {
@@ -547,12 +523,44 @@ function AdvancedTableGridComponent({
 
   const handleResizeStart = React.useCallback(
     (columnId: string, event: React.MouseEvent) => {
-      const header = table
-        .getFlatHeaders()
-        .find((h) => h.column.id === columnId);
-      header?.getResizeHandler()(event);
+      const column = latest.current.layout.ordered.find(
+        (c) => c.id === columnId
+      );
+      if (event.button !== 0 || !column) {
+        return;
+      }
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = column.width;
+      let width = startWidth;
+      setResizingColumn(columnId);
+
+      const handleMove = (moveEvent: MouseEvent) => {
+        width = Math.round(
+          Math.min(
+            MaxColumnWidth,
+            Math.max(MinColumnWidth, startWidth + moveEvent.clientX - startX)
+          )
+        );
+        setLiveWidths((current) => ({ ...current, [columnId]: width }));
+      };
+
+      const handleUp = () => {
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleUp);
+        if (width !== startWidth) {
+          update((current) => setColumnWidth(current, columnId, width), {
+            immediate: true,
+          });
+        }
+        setLiveWidths(({ [columnId]: _removed, ...rest }) => rest);
+        setResizingColumn(null);
+      };
+
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleUp);
     },
-    [table]
+    [update]
   );
 
   const handleAutoSize = React.useCallback(
