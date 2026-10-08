@@ -45,6 +45,7 @@ import Text from "./Text";
 import ToggleBlock from "./ToggleBlock";
 
 import Video from "./Video";
+import AdvancedTable from "./AdvancedTable";
 
 type Nodes = AnyExtensionClass[];
 
@@ -119,6 +120,7 @@ export const richExtensions: Nodes = [
   MathBlock,
   Mention,
   ToggleBlock,
+  AdvancedTable,
   // Container type nodes should be last so that key handlers are registered for content inside
   // the container nodes first.
   ...listExtensions,
