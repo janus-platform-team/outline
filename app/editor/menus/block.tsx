@@ -33,6 +33,7 @@ import { MentionType } from "@shared/types";
 import { toISODate } from "@shared/utils/date";
 import { metaDisplay } from "@shared/utils/keyboard";
 import Desktop from "~/utils/Desktop";
+import { customBlockItems } from "./customBlockItems";
 
 const Img = styled(Image)`
   border-radius: 2px;
@@ -283,8 +284,10 @@ export default function blockMenuItems(
     },
   ];
 
+  const allItems: MenuItem[] = [...items, ...customBlockItems(t)];
+
   // Filter out diagrams.net in desktop app
   return Desktop.isElectron()
-    ? items.filter((item) => item.name !== "editDiagram")
-    : items;
+    ? allItems.filter((item) => item.name !== "editDiagram")
+    : allItems;
 }
