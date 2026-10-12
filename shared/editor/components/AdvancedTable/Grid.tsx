@@ -17,13 +17,17 @@ import {
   deleteRows,
   filterRows,
   formatValue,
+  getPasteDelimiter,
+  getRangeBounds,
   isFilterActive,
+  isMultiCellRange,
   MaxColumnWidth,
   MaxRows,
   MinColumnWidth,
   moveColumn,
   parseCsv,
   pinColumn,
+  rangeToMatrix,
   setCell,
   setColumnWidth,
   setLayout,
@@ -35,6 +39,8 @@ import {
 import type {
   AdvancedTableColumn,
   AdvancedTableData,
+  CellPosition,
+  RangeBounds,
   AdvancedTableLayout,
   AdvancedTableRow,
   AdvancedTableSort,
@@ -89,10 +95,23 @@ export const GridAttribute = "data-advanced-table-grid";
 /** Number of center columns above which horizontal virtualization is used. */
 const ColumnVirtualizationThreshold = 30;
 
-interface CellPosition {
-  row: number;
-  col: number;
-}
+/** Distance from the grid edge, in pixels, within which dragging auto-scrolls. */
+const AutoScrollEdge = 24;
+
+/** Maximum distance scrolled per animation frame while auto-scrolling. */
+const AutoScrollSpeed = 16;
+
+/** Keys that move the active cell, and extend the range when Shift is held. */
+const NavigationKeys = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+]);
 
 interface EditingState extends CellPosition {
   initialText?: string;
@@ -158,6 +177,8 @@ function AdvancedTableGridComponent({
   );
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
   const [active, setActive] = React.useState<CellPosition | null>(null);
+  const [anchor, setAnchor] = React.useState<CellPosition | null>(null);
+  const draggingRef = React.useRef(false);
   const [editing, setEditing] = React.useState<EditingState | null>(null);
   const [paginate, setPaginate] = React.useState(false);
   const [pageIndex, setPageIndex] = React.useState(0);
@@ -257,8 +278,26 @@ function AdvancedTableGridComponent({
   const pageCount = paginate ? Math.max(1, table.getPageCount()) : 1;
   const hasFilters = Object.values(filters).some(isFilterActive);
 
+  const range = React.useMemo<RangeBounds | null>(() => {
+    if (!active) {
+      return null;
+    }
+    const bounds = getRangeBounds(anchor, active);
+    return isMultiCellRange(bounds) ? bounds : null;
+  }, [anchor, active]);
+
   const latest = React.useRef({ rows, layout, active, editing, draft });
   latest.current = { rows, layout, active, editing, draft };
+
+  React.useEffect(() => {
+    if (!active) {
+      setAnchor(null);
+    }
+  }, [active]);
+
+  React.useEffect(() => {
+    setAnchor(null);
+  }, [filters, query, activeSort, pageIndex, paginate]);
 
   React.useEffect(() => {
     if (pageIndex > pageCount - 1) {
@@ -371,15 +410,114 @@ function AdvancedTableGridComponent({
     [scrollToCell]
   );
 
+  const extendTo = React.useCallback((row: number, col: number) => {
+    const current = latest.current.active;
+    if (current && current.row === row && current.col === col) {
+      return;
+    }
+    setActive({ row, col });
+  }, []);
+
+  const startDrag = React.useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) {
+      return;
+    }
+    draggingRef.current = true;
+    let pointer: { x: number; y: number } | null = null;
+    let frame: number | null = null;
+
+    const tick = () => {
+      frame = null;
+      if (!draggingRef.current || !pointer) {
+        return;
+      }
+      const rect = scroller.getBoundingClientRect();
+      const delta = (position: number, start: number, end: number) => {
+        if (position < start + AutoScrollEdge) {
+          return -Math.min(AutoScrollSpeed, start + AutoScrollEdge - position);
+        }
+        if (position > end - AutoScrollEdge) {
+          return Math.min(AutoScrollSpeed, position - end + AutoScrollEdge);
+        }
+        return 0;
+      };
+      const dx = delta(pointer.x, rect.left + SelectionColumnWidth, rect.right);
+      const dy = delta(pointer.y, rect.top + HeaderHeight, rect.bottom);
+      if (!dx && !dy) {
+        return;
+      }
+      scroller.scrollBy(dx, dy);
+
+      // Content moves under a stationary pointer while scrolling, so mouseenter
+      // does not fire; find the cell at the clamped pointer position instead.
+      const x = Math.min(
+        rect.right - 2,
+        Math.max(rect.left + SelectionColumnWidth + 1, pointer.x)
+      );
+      const y = Math.min(
+        rect.bottom - 2,
+        Math.max(rect.top + HeaderHeight + 1, pointer.y)
+      );
+      const cell = document
+        .elementFromPoint?.(x, y)
+        ?.closest<HTMLElement>("[role='gridcell']");
+      const rowIndex =
+        cell?.closest<HTMLElement>("[data-row-index]")?.dataset.rowIndex;
+      const colIndex = cell?.getAttribute("aria-colindex");
+      if (rowIndex !== undefined && colIndex) {
+        extendTo(Number(rowIndex), Number(colIndex) - 1);
+      }
+      frame = requestAnimationFrame(tick);
+    };
+
+    const handleMove = (event: MouseEvent) => {
+      pointer = { x: event.clientX, y: event.clientY };
+      if (frame === null) {
+        frame = requestAnimationFrame(tick);
+      }
+    };
+
+    const handleUp = () => {
+      draggingRef.current = false;
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+      }
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+    };
+
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+  }, [extendTo]);
+
   const handleActivate = React.useCallback(
-    (row: number, col: number) => {
+    (row: number, col: number, extend: boolean) => {
+      const current = latest.current.active;
+      if (extend && current) {
+        setAnchor((existing) => existing ?? current);
+      } else {
+        setAnchor({ row, col });
+        startDrag();
+      }
       setActive({ row, col });
-      setEditing((current) =>
-        current && (current.row !== row || current.col !== col) ? null : current
+      setEditing((editingCell) =>
+        editingCell && (editingCell.row !== row || editingCell.col !== col)
+          ? null
+          : editingCell
       );
       focusGrid();
     },
-    [focusGrid]
+    [focusGrid, startDrag]
+  );
+
+  const handleExtend = React.useCallback(
+    (row: number, col: number) => {
+      if (draggingRef.current) {
+        extendTo(row, col);
+      }
+    },
+    [extendTo]
   );
 
   const handleStartEdit = React.useCallback(
@@ -387,6 +525,7 @@ function AdvancedTableGridComponent({
       if (!isEditable) {
         return;
       }
+      setAnchor(null);
       setActive({ row, col });
       setEditing({ row, col });
     },
@@ -398,6 +537,7 @@ function AdvancedTableGridComponent({
       const position = latest.current.editing ?? latest.current.active;
       update((current) => setCell(current, rowId, columnId, value));
       setEditing(null);
+      setAnchor(null);
       if (position && move !== "none") {
         moveActive(move, position);
         focusGrid();
@@ -670,6 +810,7 @@ function AdvancedTableGridComponent({
         );
       }
       const position = { row: Math.max(0, index), col: 0 };
+      setAnchor(null);
       setActive(position);
       scrollToCell(position);
       focusGrid();
@@ -806,6 +947,10 @@ function AdvancedTableGridComponent({
     if (key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      if (range) {
+        setAnchor(null);
+        return;
+      }
       if (selected.size) {
         setSelected(new Set());
         return;
@@ -835,6 +980,11 @@ function AdvancedTableGridComponent({
       event.preventDefault();
       event.stopPropagation();
     };
+
+    if (NavigationKeys.has(key)) {
+      const origin = active;
+      setAnchor(event.shiftKey ? (current) => current ?? origin : null);
+    }
 
     switch (key) {
       case "ArrowUp":
@@ -905,6 +1055,7 @@ function AdvancedTableGridComponent({
           return;
         }
         handled();
+        setAnchor(null);
         moveActive(event.shiftKey ? "left" : "right");
         return;
       }
@@ -937,7 +1088,24 @@ function AdvancedTableGridComponent({
       case "Delete":
       case "Backspace":
         handled();
-        if (isEditable && column && row) {
+        if (isEditable && range) {
+          const rowIds = rows
+            .slice(range.top, range.bottom + 1)
+            .map((r) => r.original.id);
+          const columnIds = layout.ordered
+            .slice(range.left, range.right + 1)
+            .map((c) => c.id);
+          update((current) =>
+            rowIds.reduce(
+              (next, rowId) =>
+                columnIds.reduce(
+                  (acc, columnId) => setCell(acc, rowId, columnId, null),
+                  next
+                ),
+              current
+            )
+          );
+        } else if (isEditable && column && row) {
           update((current) => setCell(current, row.id, column.id, null));
         }
         return;
@@ -961,8 +1129,19 @@ function AdvancedTableGridComponent({
     }
     const columns = layout.ordered;
     let text: string | null = null;
+    let isCsv = false;
 
-    if (selected.size) {
+    if (range) {
+      text = toCsv(
+        rangeToMatrix(
+          range,
+          rows.map((row) => row.original),
+          columns
+        ),
+        ","
+      );
+      isCsv = true;
+    } else if (selected.size) {
       const selectedRows = table
         .getPrePaginationRowModel()
         .rows.filter((row) => selected.has(row.original.id));
@@ -973,8 +1152,9 @@ function AdvancedTableGridComponent({
             columns.map((c) => formatValue(row.original.cells[c.id] ?? null, c))
           ),
         ],
-        "\t"
+        ","
       );
+      isCsv = true;
     } else if (active) {
       const column = columns[active.col];
       const row = rows[active.row]?.original;
@@ -986,6 +1166,9 @@ function AdvancedTableGridComponent({
     if (text !== null) {
       event.preventDefault();
       event.clipboardData.setData("text/plain", text);
+      if (isCsv) {
+        event.clipboardData.setData("text/csv", text);
+      }
     }
   };
 
@@ -993,18 +1176,55 @@ function AdvancedTableGridComponent({
     if (event.target !== scrollerRef.current || !isEditable || !active) {
       return;
     }
-    const text = event.clipboardData.getData("text/plain");
+    const csv = event.clipboardData.getData("text/csv");
+    const text = csv || event.clipboardData.getData("text/plain");
     if (!text) {
       return;
     }
     event.preventDefault();
     const grid = parseCsv(
       text.replace(/\r?\n$/, ""),
-      text.includes("\t") ? "\t" : ","
+      csv ? "," : getPasteDelimiter(text)
     );
     const columns = layout.ordered;
     const targetRowIds = rows.map((row) => row.original.id);
-    const start = active;
+    const bounds = getRangeBounds(anchor, active);
+    const start = { row: bounds.top, col: bounds.left };
+    const isFill = !!range && grid.length === 1 && grid[0]?.length === 1;
+
+    if (isFill) {
+      const value = grid[0][0];
+      const rowIds = targetRowIds.slice(bounds.top, bounds.bottom + 1);
+      const columnIds = columns
+        .slice(bounds.left, bounds.right + 1)
+        .map((c) => c.id);
+      update(
+        (current) =>
+          rowIds.reduce(
+            (next, rowId) =>
+              columnIds.reduce(
+                (acc, columnId) => setCell(acc, rowId, columnId, value),
+                next
+              ),
+            current
+          ),
+        { immediate: true }
+      );
+      return;
+    }
+
+    const pastedRows = grid.length;
+    const pastedCols = Math.min(
+      Math.max(0, ...grid.map((values) => values.length)),
+      columns.length - start.col
+    );
+    if (pastedRows > 0 && pastedCols > 0) {
+      setAnchor(start);
+      setActive({
+        row: start.row + pastedRows - 1,
+        col: start.col + pastedCols - 1,
+      });
+    }
 
     update(
       (current) => {
@@ -1186,6 +1406,10 @@ function AdvancedTableGridComponent({
             if (!row) {
               return null;
             }
+            const inRange =
+              !!range &&
+              virtualRow.index >= range.top &&
+              virtualRow.index <= range.bottom;
             return (
               <GridRow
                 key={row.original.id}
@@ -1197,10 +1421,13 @@ function AdvancedTableGridComponent({
                 centerSlice={centerSlice}
                 isRowSelected={selected.has(row.original.id)}
                 activeCol={active?.row === virtualRow.index ? active.col : null}
+                rangeLeft={inRange && range ? range.left : null}
+                rangeRight={inRange && range ? range.right : null}
                 editing={editing?.row === virtualRow.index ? editing : null}
                 isEditable={isEditable}
                 onToggleSelection={toggleRowSelection}
                 onActivate={handleActivate}
+                onExtend={handleExtend}
                 onStartEdit={handleStartEdit}
                 onCommit={handleCommit}
                 onCancel={handleCancel}
@@ -1337,10 +1564,15 @@ interface GridRowProps {
   };
   isRowSelected: boolean;
   activeCol: number | null;
+  /** First column of the selected range in this row, or null if not in range. */
+  rangeLeft: number | null;
+  /** Last column of the selected range in this row, or null if not in range. */
+  rangeRight: number | null;
   editing: EditingState | null;
   isEditable: boolean;
   onToggleSelection: (rowIndex: number, range: boolean) => void;
-  onActivate: (row: number, col: number) => void;
+  onActivate: (row: number, col: number, extend: boolean) => void;
+  onExtend: (row: number, col: number) => void;
   onStartEdit: (row: number, col: number) => void;
   onCommit: (
     rowId: string,
@@ -1360,10 +1592,13 @@ const GridRow = React.memo(function GridRow_({
   centerSlice,
   isRowSelected,
   activeCol,
+  rangeLeft,
+  rangeRight,
   editing,
   isEditable,
   onToggleSelection,
   onActivate,
+  onExtend,
   onStartEdit,
   onCommit,
   onCancel,
@@ -1379,10 +1614,17 @@ const GridRow = React.memo(function GridRow_({
       value={row.cells[column.id] ?? null}
       style={layout.styles[column.id]}
       isActive={activeCol === colIndex}
+      isInRange={
+        rangeLeft !== null &&
+        rangeRight !== null &&
+        colIndex >= rangeLeft &&
+        colIndex <= rangeRight
+      }
       isEditing={editing?.col === colIndex}
       initialText={editing?.col === colIndex ? editing.initialText : undefined}
       isEditable={isEditable}
       onActivate={onActivate}
+      onExtend={onExtend}
       onStartEdit={onStartEdit}
       onCommit={onCommit}
       onCancel={onCancel}

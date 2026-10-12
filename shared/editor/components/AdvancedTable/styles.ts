@@ -106,6 +106,7 @@ export const Row = styled.div<{ $selected: boolean }>`
 export const CellBox = styled.div<{
   $align?: "left" | "right" | "center";
   $active?: boolean;
+  $inRange?: boolean;
   $pinned?: boolean;
 }>`
   flex: none;
@@ -132,6 +133,18 @@ export const CellBox = styled.div<{
     css`
       position: sticky;
       z-index: 1;
+    `}
+
+  ${(props) =>
+    props.$inRange &&
+    css`
+      /* Outranks the row hover and selection backgrounds. */
+      &&& {
+        background-image: linear-gradient(
+          ${s("tableSelectedBackground")},
+          ${s("tableSelectedBackground")}
+        );
+      }
     `}
 
   ${(props) =>

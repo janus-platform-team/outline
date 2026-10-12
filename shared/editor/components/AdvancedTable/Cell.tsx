@@ -25,14 +25,18 @@ interface Props {
   style: React.CSSProperties;
   /** Whether the cell is the keyboard focused cell. */
   isActive: boolean;
+  /** Whether the cell is within a selected range of multiple cells. */
+  isInRange?: boolean;
   /** Whether the cell is currently being edited. */
   isEditing: boolean;
   /** Initial text when editing was started by typing a character. */
   initialText?: string;
   /** Whether the grid is editable. */
   isEditable: boolean;
-  /** Called when the cell is clicked. */
-  onActivate: (rowIndex: number, colIndex: number) => void;
+  /** Called when the cell is pressed, extend is true when Shift is held. */
+  onActivate: (rowIndex: number, colIndex: number, extend: boolean) => void;
+  /** Called when the pointer enters the cell, used to extend a drag selection. */
+  onExtend?: (rowIndex: number, colIndex: number) => void;
   /** Called to begin editing the cell. */
   onStartEdit: (rowIndex: number, colIndex: number) => void;
   /** Called with the new value when editing completes. */
@@ -61,10 +65,12 @@ function CellComponent({
   value,
   style,
   isActive,
+  isInRange,
   isEditing,
   initialText,
   isEditable,
   onActivate,
+  onExtend,
   onStartEdit,
   onCommit,
   onCancel,
@@ -76,9 +82,19 @@ function CellComponent({
         ? "center"
         : "left";
 
-  const handleMouseDown = React.useCallback(() => {
-    onActivate(rowIndex, colIndex);
-  }, [onActivate, rowIndex, colIndex]);
+  const handleMouseDown = React.useCallback(
+    (event: React.MouseEvent) => {
+      if (event.button !== 0) {
+        return;
+      }
+      onActivate(rowIndex, colIndex, event.shiftKey);
+    },
+    [onActivate, rowIndex, colIndex]
+  );
+
+  const handleMouseEnter = React.useCallback(() => {
+    onExtend?.(rowIndex, colIndex);
+  }, [onExtend, rowIndex, colIndex]);
 
   const handleDoubleClick = React.useCallback(() => {
     if (isEditable && column.type !== "boolean") {
@@ -96,13 +112,15 @@ function CellComponent({
   return (
     <CellBox
       role="gridcell"
-      aria-selected={isActive}
+      aria-selected={isActive || isInRange}
       aria-colindex={colIndex + 1}
       $align={align}
       $active={isActive && !isEditing}
+      $inRange={isInRange}
       $pinned={!!column.pinned}
       style={style}
       onMouseDown={handleMouseDown}
+      onMouseEnter={handleMouseEnter}
       onDoubleClick={handleDoubleClick}
       title={
         column.type === "text" && typeof value === "string" && value.length > 30
