@@ -13,6 +13,7 @@ import type {
   AdvancedTableColumn,
   AdvancedTableColumnType,
   AdvancedTableData,
+  AdvancedTableLayout,
   AdvancedTablePinned,
   AdvancedTableRow,
   AdvancedTableSort,
@@ -140,7 +141,11 @@ export function normalizeTableData(input: unknown): AdvancedTableData {
     }
   }
 
-  return { version: 1, columns, rows, sort };
+  const data: AdvancedTableData = { version: 1, columns, rows, sort };
+  if (input.layout === "full" || input.layout === "auto") {
+    data.layout = input.layout;
+  }
+  return data;
 }
 
 /**
@@ -575,6 +580,21 @@ export function setSort(
 ): AdvancedTableData {
   const ids = new Set(data.columns.map((c) => c.id));
   return { ...data, sort: sort.filter((s) => ids.has(s.columnId)) };
+}
+
+/**
+ * Sets the width mode of the table.
+ *
+ * @param data the table data.
+ * @param layout the new width mode.
+ * @returns the updated table data.
+ */
+export function setLayout(
+  data: AdvancedTableData,
+  layout: AdvancedTableLayout
+): AdvancedTableData {
+  const { layout: _previous, ...rest } = data;
+  return layout === "normal" ? rest : { ...rest, layout };
 }
 
 /**

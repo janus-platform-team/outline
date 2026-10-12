@@ -121,6 +121,7 @@ export default class AdvancedTable extends Node {
           {
             class: "advanced-table",
             "data-advanced-table": "",
+            ...(data.layout ? { "data-layout": data.layout } : {}),
             "data-json": JSON.stringify(data),
             contentEditable: "false",
           },

@@ -13,6 +13,7 @@ import {
   pinColumn,
   setCell,
   setColumnWidth,
+  setLayout,
   setSort,
   tableDataLength,
   tableToPlainText,
@@ -70,6 +71,29 @@ describe("normalizeTableData", () => {
     expect(data.rows[0].cells).toEqual({ a: 12, [data.columns[1].id]: null });
     expect(data.rows[1].id).not.toBe("r1");
     expect(data.sort).toEqual([{ columnId: "a", desc: true }]);
+  });
+
+  it("keeps valid layouts and drops invalid or normal ones", () => {
+    const columns = [{ id: "a", name: "A", type: "text", width: 100 }];
+    expect(normalizeTableData({ columns, layout: "full" }).layout).toBe("full");
+    expect(normalizeTableData({ columns, layout: "auto" }).layout).toBe("auto");
+    expect("layout" in normalizeTableData({ columns, layout: "normal" })).toBe(
+      false
+    );
+    expect("layout" in normalizeTableData({ columns, layout: "wide" })).toBe(
+      false
+    );
+  });
+});
+
+describe("setLayout", () => {
+  it("sets and clears the layout", () => {
+    const data = createEmptyTable();
+    const full = setLayout(data, "full");
+    expect(full.layout).toBe("full");
+    expect(setLayout(full, "auto").layout).toBe("auto");
+    expect("layout" in setLayout(full, "normal")).toBe(false);
+    expect(data.layout).toBeUndefined();
   });
 });
 

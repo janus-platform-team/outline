@@ -5,6 +5,7 @@ import { buildLightTheme } from "../../../styles/theme";
 import {
   createEmptyTable,
   MaxDataLength,
+  setCell,
   tableDataLength,
 } from "../../lib/advancedTable";
 import type { AdvancedTableData } from "../../lib/advancedTable";
@@ -147,5 +148,206 @@ describeDom("AdvancedTableGrid", () => {
     expect(container.textContent).toContain(
       "The table has reached its maximum size"
     );
+  });
+
+  describe("cell ranges", () => {
+    const sampleData = () => {
+      let data = createEmptyTable(3, 3);
+      const [a, b] = data.columns;
+      data = setCell(data, data.rows[0].id, a.id, "a,b");
+      data = setCell(data, data.rows[0].id, b.id, "x");
+      data = setCell(data, data.rows[1].id, a.id, 'say "hi"');
+      data = setCell(data, data.rows[1].id, b.id, "y");
+      return data;
+    };
+
+    const cellAt = (row: number, col: number) =>
+      container.querySelector<HTMLElement>(
+        `[data-row-index="${row}"] [aria-colindex="${col + 1}"]`
+      );
+
+    const selectedCount = () =>
+      container.querySelectorAll('[role="gridcell"][aria-selected="true"]')
+        .length;
+
+    const press = (row: number, col: number, shiftKey = false) => {
+      act(() => {
+        cellAt(row, col)?.dispatchEvent(
+          new MouseEvent("mousedown", { bubbles: true, button: 0, shiftKey })
+        );
+      });
+      act(() => {
+        document.dispatchEvent(new MouseEvent("mouseup"));
+      });
+    };
+
+    const keyDown = (key: string, shiftKey = false) => {
+      act(() => {
+        container
+          .querySelector('[role="grid"]')
+          ?.dispatchEvent(
+            new KeyboardEvent("keydown", { key, shiftKey, bubbles: true })
+          );
+      });
+    };
+
+    const clipboardEvent = (type: "copy" | "paste", text = "") => {
+      const data = new Map<string, string>([["text/plain", text]]);
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", {
+        value: {
+          getData: (format: string) => data.get(format) ?? "",
+          setData: (format: string, value: string) => data.set(format, value),
+        },
+      });
+      act(() => {
+        container.querySelector('[role="grid"]')?.dispatchEvent(event);
+      });
+      return data;
+    };
+
+    const lastSaved = (onChange: ReturnType<typeof vi.fn>) => {
+      act(() => {
+        vi.runAllTimers();
+      });
+      const calls = onChange.mock.calls;
+      const saved: AdvancedTableData = calls[calls.length - 1][0];
+      return saved;
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("extends the range with Shift-click", () => {
+      renderGrid(sampleData());
+      press(0, 0);
+      expect(selectedCount()).toBe(1);
+      press(1, 1, true);
+      expect(selectedCount()).toBe(4);
+    });
+
+    it("extends the range by dragging across cells", () => {
+      renderGrid(sampleData());
+      act(() => {
+        cellAt(0, 0)?.dispatchEvent(
+          new MouseEvent("mousedown", { bubbles: true, button: 0 })
+        );
+      });
+      act(() => {
+        cellAt(2, 1)?.dispatchEvent(
+          new MouseEvent("mouseover", { bubbles: true, relatedTarget: null })
+        );
+      });
+      act(() => {
+        document.dispatchEvent(new MouseEvent("mouseup"));
+      });
+      expect(selectedCount()).toBe(6);
+
+      // Hovering after the mouse is released does not change the range.
+      act(() => {
+        cellAt(0, 2)?.dispatchEvent(
+          new MouseEvent("mouseover", { bubbles: true, relatedTarget: null })
+        );
+      });
+      expect(selectedCount()).toBe(6);
+    });
+
+    it("extends the range with Shift and the arrow keys", () => {
+      renderGrid(sampleData());
+      press(0, 0);
+      keyDown("ArrowDown", true);
+      keyDown("ArrowRight", true);
+      expect(selectedCount()).toBe(4);
+      keyDown("ArrowRight");
+      expect(selectedCount()).toBe(1);
+    });
+
+    it("collapses the range with Escape", () => {
+      renderGrid(sampleData());
+      press(0, 0);
+      press(1, 1, true);
+      keyDown("Escape");
+      expect(selectedCount()).toBe(1);
+    });
+
+    it("copies a range as CSV", () => {
+      renderGrid(sampleData());
+      press(0, 0);
+      press(1, 1, true);
+      const clipboard = clipboardEvent("copy");
+      const expected = '"a,b",x\r\n"say ""hi""",y';
+      expect(clipboard.get("text/plain")).toBe(expected);
+      expect(clipboard.get("text/csv")).toBe(expected);
+    });
+
+    it("copies a single cell as its plain value", () => {
+      renderGrid(sampleData());
+      press(0, 0);
+      const clipboard = clipboardEvent("copy");
+      expect(clipboard.get("text/plain")).toBe("a,b");
+      expect(clipboard.has("text/csv")).toBe(false);
+    });
+
+    it("pastes CSV across multiple cells and selects them", () => {
+      const data = sampleData();
+      const onChange = renderGrid(data);
+      press(1, 1);
+      clipboardEvent("paste", '1,"two, too"\n3,4\n');
+      const saved = lastSaved(onChange);
+      const [, b, c] = data.columns;
+      expect(saved.rows[1].cells[b.id]).toBe("1");
+      expect(saved.rows[1].cells[c.id]).toBe("two, too");
+      expect(saved.rows[2].cells[b.id]).toBe("3");
+      expect(saved.rows[2].cells[c.id]).toBe("4");
+      expect(selectedCount()).toBe(4);
+    });
+
+    it("pastes from the top-left cell of the range", () => {
+      const data = sampleData();
+      const onChange = renderGrid(data);
+      press(1, 1);
+      press(0, 0, true);
+      clipboardEvent("paste", "p,q");
+      const saved = lastSaved(onChange);
+      const [a, b] = data.columns;
+      expect(saved.rows[0].cells[a.id]).toBe("p");
+      expect(saved.rows[0].cells[b.id]).toBe("q");
+      expect(saved.rows[1].cells[a.id]).toBe('say "hi"');
+    });
+
+    it("fills the range when pasting a single value", () => {
+      const data = sampleData();
+      const onChange = renderGrid(data);
+      press(0, 0);
+      press(1, 1, true);
+      clipboardEvent("paste", "z");
+      const saved = lastSaved(onChange);
+      const [a, b, c] = data.columns;
+      for (const row of saved.rows.slice(0, 2)) {
+        expect(row.cells[a.id]).toBe("z");
+        expect(row.cells[b.id]).toBe("z");
+        expect(row.cells[c.id]).toBeNull();
+      }
+      expect(saved.rows[2].cells[a.id]).toBeNull();
+    });
+
+    it("clears every cell in the range with Delete", () => {
+      const data = sampleData();
+      const onChange = renderGrid(data);
+      press(0, 0);
+      press(1, 1, true);
+      keyDown("Delete");
+      const saved = lastSaved(onChange);
+      for (const row of saved.rows) {
+        for (const column of saved.columns) {
+          expect(row.cells[column.id]).toBeNull();
+        }
+      }
+    });
   });
 });

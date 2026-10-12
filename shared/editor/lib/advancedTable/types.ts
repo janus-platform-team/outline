@@ -9,6 +9,13 @@ export type AdvancedTableCellValue = string | number | boolean | null;
 
 export type AdvancedTablePinned = "left" | "right";
 
+/**
+ * How the table is sized relative to the document: "normal" fits the text
+ * column, "full" spans the page width and "auto" grows with its content up to
+ * the page width while staying centered.
+ */
+export type AdvancedTableLayout = "normal" | "full" | "auto";
+
 export interface AdvancedTableColumn {
   /** Stable identifier used as the key for row cells. */
   id: string;
@@ -49,6 +56,8 @@ export interface AdvancedTableData {
   rows: AdvancedTableRow[];
   /** Persisted sort order, first entry has the highest precedence. */
   sort?: AdvancedTableSort[];
+  /** Width mode of the table, omitted for the normal layout. */
+  layout?: Exclude<AdvancedTableLayout, "normal">;
 }
 
 export const AdvancedTableColumnTypes: AdvancedTableColumnType[] = [
