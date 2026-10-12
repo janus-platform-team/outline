@@ -26,6 +26,7 @@ import {
   pinColumn,
   setCell,
   setColumnWidth,
+  setLayout,
   setSort,
   tableFromCsv,
   toCsv,
@@ -34,6 +35,7 @@ import {
 import type {
   AdvancedTableColumn,
   AdvancedTableData,
+  AdvancedTableLayout,
   AdvancedTableRow,
   AdvancedTableSort,
   ColumnFilter,
@@ -702,7 +704,9 @@ function AdvancedTableGridComponent({
         return;
       }
       const result = tableFromCsv(text);
-      update(() => result.data, { immediate: true });
+      update((current) => setLayout(result.data, current.layout ?? "normal"), {
+        immediate: true,
+      });
       setFilters({});
       setQuery("");
       setSelected(new Set());
@@ -755,6 +759,13 @@ function AdvancedTableGridComponent({
     setPageIndex(0);
     setActive(null);
   }, []);
+
+  const handleLayoutChange = React.useCallback(
+    (value: AdvancedTableLayout) => {
+      update((current) => setLayout(current, value), { immediate: true });
+    },
+    [update]
+  );
 
   const handleClearFilters = React.useCallback(() => {
     setFilters({});
@@ -1069,6 +1080,14 @@ function AdvancedTableGridComponent({
     );
   };
 
+  const tableLayout: AdvancedTableLayout = draft.layout ?? "normal";
+  const contentWidthStyle = React.useMemo<
+    React.CSSProperties & Record<"--content-width", string>
+  >(
+    () => ({ "--content-width": `${layout.totalWidth + 2}px` }),
+    [layout.totalWidth]
+  );
+
   const virtualRows = rowVirtualizer.getVirtualItems();
   const centerOffset = layout.left.length;
   const rightOffset = layout.left.length + layout.center.length;
@@ -1077,6 +1096,8 @@ function AdvancedTableGridComponent({
     <Wrapper
       ref={wrapperRef}
       $selected={isSelected}
+      $layout={tableLayout}
+      style={contentWidthStyle}
       onBlur={handleBlur}
       {...{ [GridAttribute]: "" }}
     >
@@ -1090,6 +1111,8 @@ function AdvancedTableGridComponent({
         canAddRow={draft.rows.length < MaxRows}
         paginate={paginate}
         hasFilters={hasFilters}
+        layout={tableLayout}
+        onLayoutChange={handleLayoutChange}
         onQueryChange={handleQueryChange}
         onAddRow={handleAddRow}
         onAddColumn={handleAddColumn}

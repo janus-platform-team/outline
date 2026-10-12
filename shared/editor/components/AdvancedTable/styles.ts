@@ -1,5 +1,7 @@
 import styled, { css } from "styled-components";
 import { s } from "../../../styles";
+import type { AdvancedTableLayout } from "../../lib/advancedTable";
+import { EditorStyleHelper } from "../../styles/EditorStyleHelper";
 
 export const RowHeight = 34;
 
@@ -11,8 +13,16 @@ export const MaxGridHeight = 480;
 
 export const PageSize = 100;
 
-export const Wrapper = styled.div<{ $selected: boolean }>`
+const pageWidth = `calc(var(--container-width, 100%) - ${
+  EditorStyleHelper.padding * 2
+}px)`;
+
+export const Wrapper = styled.div<{
+  $selected: boolean;
+  $layout: AdvancedTableLayout;
+}>`
   position: relative;
+  box-sizing: border-box;
   margin: 0.75em 0;
   border: 1px solid ${s("divider")};
   border-radius: 6px;
@@ -28,6 +38,18 @@ export const Wrapper = styled.div<{ $selected: boolean }>`
     props.$selected &&
     css`
       box-shadow: 0 0 0 2px ${s("selected")};
+    `}
+
+  ${(props) =>
+    props.$layout !== "normal" &&
+    css`
+      left: 50%;
+      transform: translateX(
+        calc(-50% + var(--full-width-transform-offset, 0px))
+      );
+      width: ${props.$layout === "full"
+        ? `max(100%, ${pageWidth})`
+        : `max(100%, min(var(--content-width), ${pageWidth}))`};
     `}
 `;
 
@@ -354,6 +376,17 @@ export const MenuItem = styled.button<{ $danger?: boolean }>`
     opacity: 0.4;
     cursor: default;
   }
+`;
+
+export const OptionItem = styled(MenuItem)`
+  justify-content: space-between;
+  padding: 4px 8px;
+`;
+
+export const MenuItemHint = styled.span`
+  display: block;
+  font-size: 12px;
+  color: ${s("textTertiary")};
 `;
 
 export const MenuSeparator = styled.hr`

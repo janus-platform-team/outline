@@ -3,7 +3,12 @@ import {
   DOMSerializer,
 } from "prosemirror-model";
 import { extensionManager, findNodes, schema } from "../../test/editor";
-import { createEmptyTable, setCell, updateColumn } from "../lib/advancedTable";
+import {
+  createEmptyTable,
+  setCell,
+  setLayout,
+  updateColumn,
+} from "../lib/advancedTable";
 import type { AdvancedTableData } from "../lib/advancedTable";
 
 const serializer = extensionManager.serializer();
@@ -46,6 +51,16 @@ describe("AdvancedTable node", () => {
     expect(findNodes(parsed?.toJSON(), "code_block")).toHaveLength(0);
   });
 
+  it.each(["full", "auto"] as const)(
+    "keeps the %s layout through markdown",
+    (layout) => {
+      const data = setLayout(sampleData(), layout);
+      const parsed = parser.parse(serializer.serialize(createDoc(data)));
+      const nodes = findNodes(parsed?.toJSON(), "advanced_table");
+      expect(nodes[0].attrs?.data).toEqual(data);
+    }
+  );
+
   it("leaves other fenced code blocks untouched", () => {
     const parsed = parser.parse("```js\nconst a = 1;\n```");
     expect(findNodes(parsed?.toJSON(), "code_block")).toHaveLength(1);
@@ -86,6 +101,27 @@ describeDom("AdvancedTable node HTML", () => {
     expect(nodes[0].attrs?.data).toEqual(data);
     expect(findNodes(parsed.toJSON(), "table")).toHaveLength(0);
   });
+
+  it.each(["full", "auto"] as const)(
+    "keeps the %s layout through HTML",
+    (layout) => {
+      const data = setLayout(sampleData(), layout);
+      const dom = DOMSerializer.fromSchema(schema).serializeNode(
+        schema.nodes.advanced_table.create({ data })
+      );
+      const container = document.createElement("div");
+      container.appendChild(dom);
+      expect(
+        container
+          .querySelector("[data-advanced-table]")
+          ?.getAttribute("data-layout")
+      ).toBe(layout);
+
+      const parsed = ProsemirrorDOMParser.fromSchema(schema).parse(container);
+      const nodes = findNodes(parsed.toJSON(), "advanced_table");
+      expect(nodes[0].attrs?.data).toEqual(data);
+    }
+  );
 
   it("omits hidden columns from the static HTML", () => {
     let data = sampleData();

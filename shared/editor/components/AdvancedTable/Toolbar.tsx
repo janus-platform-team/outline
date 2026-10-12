@@ -1,4 +1,6 @@
 import {
+  AlignFullWidthIcon,
+  DoneIcon,
   DownloadIcon,
   EyeIcon,
   ImportIcon,
@@ -8,11 +10,16 @@ import {
 } from "outline-icons";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import type { AdvancedTableColumn } from "../../lib/advancedTable";
+import type {
+  AdvancedTableColumn,
+  AdvancedTableLayout,
+} from "../../lib/advancedTable";
 import { Popover } from "./Popover";
 import {
   Checkbox,
   CheckRow,
+  MenuItemHint,
+  OptionItem,
   SearchInput,
   Status,
   Toolbar as ToolbarBox,
@@ -39,6 +46,9 @@ interface Props {
   paginate: boolean;
   /** Whether any column filters are active. */
   hasFilters: boolean;
+  /** The width mode of the table. */
+  layout: AdvancedTableLayout;
+  onLayoutChange: (layout: AdvancedTableLayout) => void;
   onQueryChange: (query: string) => void;
   onAddRow: () => void;
   onAddColumn: () => void;
@@ -64,6 +74,8 @@ function ToolbarComponent({
   canAddRow,
   paginate,
   hasFilters,
+  layout,
+  onLayoutChange,
   onQueryChange,
   onAddRow,
   onAddColumn,
@@ -79,7 +91,31 @@ function ToolbarComponent({
   const [columnsAnchor, setColumnsAnchor] = React.useState<HTMLElement | null>(
     null
   );
+  const [layoutAnchor, setLayoutAnchor] = React.useState<HTMLElement | null>(
+    null
+  );
   const visibleCount = columns.filter((c) => !c.hidden).length;
+  const layoutOptions: {
+    value: AdvancedTableLayout;
+    label: string;
+    hint: string;
+  }[] = [
+    {
+      value: "normal",
+      label: t("Normal"),
+      hint: t("Fit the width of the text"),
+    },
+    {
+      value: "full",
+      label: t("Full width"),
+      hint: t("Expand to the width of the page"),
+    },
+    {
+      value: "auto",
+      label: t("Auto"),
+      hint: t("Fit the content, up to the width of the page"),
+    },
+  ];
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -135,6 +171,13 @@ function ToolbarComponent({
           >
             <EyeIcon size={18} /> {t("Columns")}
           </ToolbarButton>
+          <ToolbarButton
+            type="button"
+            aria-haspopup="dialog"
+            onClick={(event) => setLayoutAnchor(event.currentTarget)}
+          >
+            <AlignFullWidthIcon size={18} /> {t("Width")}
+          </ToolbarButton>
           <ToolbarButton type="button" onClick={() => fileRef.current?.click()}>
             <ImportIcon size={18} /> {t("Import")}
           </ToolbarButton>
@@ -176,6 +219,34 @@ function ToolbarComponent({
               {column.name || t("Untitled")}
             </CheckRow>
           ))}
+        </Popover>
+      )}
+      {layoutAnchor && (
+        <Popover
+          anchor={layoutAnchor}
+          onClose={() => setLayoutAnchor(null)}
+          label={t("Width")}
+        >
+          <div role="radiogroup" aria-label={t("Width")}>
+            {layoutOptions.map((option) => (
+              <OptionItem
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={layout === option.value}
+                onClick={() => {
+                  onLayoutChange(option.value);
+                  setLayoutAnchor(null);
+                }}
+              >
+                <span>
+                  {option.label}
+                  <MenuItemHint>{option.hint}</MenuItemHint>
+                </span>
+                {layout === option.value && <DoneIcon size={18} />}
+              </OptionItem>
+            ))}
+          </div>
         </Popover>
       )}
     </ToolbarBox>
