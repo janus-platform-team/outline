@@ -1301,11 +1301,26 @@ function AdvancedTableGridComponent({
   };
 
   const tableLayout: AdvancedTableLayout = draft.layout ?? "normal";
+  const [scrollbarWidth, setScrollbarWidth] = React.useState(0);
+
+  React.useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller?.clientWidth) {
+      return;
+    }
+    const width = scroller.offsetWidth - scroller.clientWidth;
+    setScrollbarWidth((current) => (current === width ? current : width));
+  }, [rows.length, layout.totalWidth, tableLayout]);
+
+  // Includes the wrapper borders and any vertical scrollbar so that auto width
+  // reveals every column.
   const contentWidthStyle = React.useMemo<
     React.CSSProperties & Record<"--content-width", string>
   >(
-    () => ({ "--content-width": `${layout.totalWidth + 2}px` }),
-    [layout.totalWidth]
+    () => ({
+      "--content-width": `${layout.totalWidth + 2 + scrollbarWidth}px`,
+    }),
+    [layout.totalWidth, scrollbarWidth]
   );
 
   const virtualRows = rowVirtualizer.getVirtualItems();

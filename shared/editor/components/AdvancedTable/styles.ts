@@ -22,7 +22,6 @@ export const Wrapper = styled.div<{
   $layout: AdvancedTableLayout;
 }>`
   position: relative;
-  box-sizing: border-box;
   margin: 0.75em 0;
   border: 1px solid ${s("divider")};
   border-radius: 6px;
@@ -33,6 +32,11 @@ export const Wrapper = styled.div<{
   white-space: normal;
   overflow: hidden;
   user-select: none;
+
+  /* Outranks the editor's content-box rule for all descendants. */
+  && {
+    box-sizing: border-box;
+  }
 
   ${(props) =>
     props.$selected &&
@@ -82,7 +86,11 @@ export const Row = styled.div<{ $selected: boolean }>`
   top: 0;
   height: ${RowHeight}px;
   border-bottom: 1px solid ${s("divider")};
-  box-sizing: border-box;
+
+  /* Outranks the editor's content-box rule for all descendants. */
+  && {
+    box-sizing: border-box;
+  }
 
   > div {
     ${(props) =>
@@ -120,7 +128,12 @@ export const CellBox = styled.div<{
         : "flex-start"};
   height: 100%;
   padding: 0 8px;
-  box-sizing: border-box;
+
+  /* Outranks the editor's content-box rule for all descendants, otherwise
+  padding and borders are added to the column widths. */
+  && {
+    box-sizing: border-box;
+  }
   border-right: 1px solid ${s("divider")};
   background-color: ${s("background")};
   overflow: hidden;
