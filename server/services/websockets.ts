@@ -1,11 +1,11 @@
 import type { IncomingMessage } from "node:http";
 import type http from "node:http";
 import type { Duplex } from "node:stream";
+import { createAdapter } from "@socket.io/redis-adapter";
 import cookie from "cookie";
 import type Koa from "koa";
 import IO from "socket.io";
-import { createAdapter } from "socket.io-redis";
-import { errToString } from "@shared/utils/error";
+import { errToId, errToString, toError } from "@shared/utils/error";
 import env from "@server/env";
 import { AuthenticationError } from "@server/errors";
 import Logger from "@server/logging/Logger";
@@ -13,6 +13,7 @@ import Metrics from "@server/logging/Metrics";
 import * as Tracing from "@server/logging/tracer";
 import { traceFunction } from "@server/logging/tracing";
 import type { User } from "@server/models";
+import { rejectUpgrade } from "@server/onupgrade";
 import Redis from "@server/storage/redis";
 import ShutdownHelper, { ShutdownOrder } from "@server/utils/ShutdownHelper";
 import { getUserForJWT } from "@server/utils/jwt";
@@ -69,7 +70,7 @@ export default function init(
           !env.isCloudHosted &&
           (!req.headers.origin || !env.URL.startsWith(req.headers.origin))
         ) {
-          socket.end(`HTTP/1.1 400 Bad Request\r\n`);
+          rejectUpgrade(socket);
           return;
         }
 
@@ -83,7 +84,7 @@ export default function init(
       }
 
       // If the collaboration service isn't running then we need to close the connection
-      socket.end(`HTTP/1.1 400 Bad Request\r\n`);
+      rejectUpgrade(socket);
     }
   );
 
@@ -91,20 +92,7 @@ export default function init(
     Metrics.gaugePerInstance("websockets.count", 0);
   });
 
-  io.adapter(
-    createAdapter({
-      pubClient: Redis.defaultClient,
-      subClient: Redis.defaultSubscriber,
-    })
-  );
-
-  io.of("/").adapter.on("error", (err: Error) => {
-    if (err.name === "MaxRetriesPerRequestError") {
-      Logger.fatal("Redis maximum retries exceeded in socketio adapter", err);
-    } else {
-      Logger.error("Redis error in socketio adapter", err);
-    }
-  });
+  io.adapter(createAdapter(Redis.defaultClient, Redis.defaultSubscriber));
 
   io.on("connection", async (socket: SocketWithAuth) => {
     Metrics.increment("websockets.connected");
@@ -136,13 +124,26 @@ export default function init(
       Logger.debug("websockets", `Authenticated socket ${socket.id}`);
 
       socket.emit("authenticated", true);
-      void authenticated(io, socket, user);
+      void authenticated(io, socket, user).catch((err) => {
+        Logger.error(
+          "Failed to join rooms for authenticated socket",
+          toError(err),
+          {
+            socketId: socket.id,
+            userId: user.id,
+          }
+        );
+
+        // The socket receives no events without its rooms, disconnect so that
+        // the client reconnects and tries again.
+        socket.disconnect();
+      });
     } catch (err) {
       const message = errToString(err);
       Logger.debug("websockets", `Authentication error socket ${socket.id}`, {
         error: message,
       });
-      socket.emit("unauthorized", { message }, function () {
+      socket.emit("unauthorized", { message, id: errToId(err) }, function () {
         socket.disconnect();
       });
     }

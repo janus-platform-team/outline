@@ -51,9 +51,11 @@ export const Wrapper = styled.div<{
       transform: translateX(
         calc(-50% + var(--full-width-transform-offset, 0px))
       );
-      width: ${props.$layout === "full"
-        ? `max(100%, ${pageWidth})`
-        : `max(100%, min(var(--content-width), ${pageWidth}))`};
+      width: ${
+        props.$layout === "full"
+          ? `max(100%, ${pageWidth})`
+          : `max(100%, min(var(--content-width), ${pageWidth}))`
+      };
     `}
 `;
 

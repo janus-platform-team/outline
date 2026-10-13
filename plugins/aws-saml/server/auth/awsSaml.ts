@@ -1,7 +1,7 @@
 import passport from "@outlinewiki/koa-passport";
 import type { Strategy as PassportStrategy } from "@outlinewiki/koa-passport";
 import type { Context, Request } from "koa";
-import Router from "koa-router";
+import Router from "@koa/router";
 import {
   Strategy as SamlStrategy,
   type Profile,
