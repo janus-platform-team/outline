@@ -1,8 +1,8 @@
 import { observer } from "mobx-react";
 import * as React from "react";
 import { mergeRefs } from "react-merge-refs";
-import { useLocation } from "react-router-dom";
-import styled, { css, useTheme } from "styled-components";
+import { useHistory } from "react-router-dom";
+import styled, { useTheme } from "styled-components";
 import breakpoint from "styled-components-breakpoint";
 import { depths, s } from "@shared/styles";
 import { Avatar } from "~/components/Avatar";
@@ -10,7 +10,6 @@ import Flex from "~/components/Flex";
 import useCurrentUser from "~/hooks/useCurrentUser";
 import useEventListener from "~/hooks/useEventListener";
 import useMobile from "~/hooks/useMobile";
-import usePrevious from "~/hooks/usePrevious";
 import { useResizeHandle } from "~/hooks/useResizeHandle";
 import useStores from "~/hooks/useStores";
 import AccountMenu from "~/menus/AccountMenu";
@@ -33,26 +32,34 @@ type Props = {
   hidden?: boolean;
   /** Whether the sidebar can be collapsed, defaults to true. */
   canCollapse?: boolean;
+  /** Whether to show the account menu for the signed-in user, defaults to true. */
+  showAccountMenu?: boolean;
   /** CSS class name(s) to apply to the sidebar container. */
   className?: string;
   /** Content to render inside the sidebar. */
   children: React.ReactNode;
+  /** Ref to the sidebar container. */
+  ref?: React.Ref<HTMLDivElement>;
 };
 
-const Sidebar = React.forwardRef<HTMLDivElement, Props>(function Sidebar_(
-  { children, hidden = false, canCollapse = true, className }: Props,
-  ref: React.RefObject<HTMLDivElement>
-) {
+function Sidebar({
+  children,
+  hidden = false,
+  canCollapse = true,
+  showAccountMenu = true,
+  className,
+  ref,
+}: Props) {
   const [isCollapsing, setCollapsing] = React.useState(false);
   const { t } = useTranslation();
   const theme = useTheme();
   const { ui } = useStores();
-  const location = useLocation();
-  const previousLocation = usePrevious(location);
+  const history = useHistory();
   const user = useCurrentUser({ rejectOnEmpty: false });
   const isMobile = useMobile();
   const width = ui.sidebarWidth;
-  const collapsed = ui.sidebarIsClosed && canCollapse;
+  const sidebarIsClosed = ui.sidebarIsClosed;
+  const collapsed = sidebarIsClosed && canCollapse;
   const maxWidth = theme.sidebarMaxWidth;
   const minWidth = theme.sidebarResizeMinWidth;
   const direction = useDirection();
@@ -141,7 +148,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, Props>(function Sidebar_(
 
   const handlePointerActivity = React.useCallback(
     (event: React.PointerEvent) => {
-      if (ui.sidebarIsClosed) {
+      if (sidebarIsClosed) {
         // don't reveal while a button is held, e.g. selecting text near the edge
         if (event.buttons !== 0) {
           return;
@@ -154,11 +161,11 @@ const Sidebar = React.forwardRef<HTMLDivElement, Props>(function Sidebar_(
         setPointerMoved(true);
       }
     },
-    [ui.sidebarIsClosed]
+    [sidebarIsClosed]
   );
 
   const handlePointerLeave = React.useCallback(
-    (ev) => {
+    (ev: React.PointerEvent) => {
       if (hasPointerMoved) {
         // clear any previous timeout
         if (hoverTimeoutRef.current) {
@@ -185,11 +192,11 @@ const Sidebar = React.forwardRef<HTMLDivElement, Props>(function Sidebar_(
   );
 
   React.useEffect(() => {
-    if (ui.sidebarIsClosed) {
+    if (sidebarIsClosed) {
       setHovering(false);
       setPointerMoved(false);
     }
-  }, [ui.sidebarIsClosed]);
+  }, [sidebarIsClosed]);
 
   // Reset stale hover state when the sidebar becomes visible after being
   // hidden via display:none (e.g. returning from settings). Without this, a
@@ -241,11 +248,15 @@ const Sidebar = React.forwardRef<HTMLDivElement, Props>(function Sidebar_(
     ui.setSidebarResizing(isResizing);
   }, [ui, isResizing]);
 
-  React.useEffect(() => {
-    if (location !== previousLocation) {
-      ui.hideMobileSidebar();
-    }
-  }, [ui, location, previousLocation]);
+  // Subscribe to history rather than the location, so that the sidebar does
+  // not re-render on every navigation.
+  React.useEffect(
+    () =>
+      history.listen(() => {
+        ui.hideMobileSidebar();
+      }),
+    [ui, history]
+  );
 
   const style = React.useMemo(
     () => ({
@@ -279,7 +290,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, Props>(function Sidebar_(
       >
         {children}
 
-        {user && (
+        {user && showAccountMenu && (
           <AccountMenu>
             <SidebarButton
               showMoreMenu
@@ -307,13 +318,13 @@ const Sidebar = React.forwardRef<HTMLDivElement, Props>(function Sidebar_(
         )}
         <ResizeBorder
           onMouseDown={handleMouseDown}
-          onDoubleClick={ui.sidebarIsClosed ? undefined : handleReset}
+          onDoubleClick={sidebarIsClosed ? undefined : handleReset}
         />
       </Container>
       {ui.mobileSidebarVisible && <Backdrop onClick={handleCloseSidebar} />}
     </TooltipProvider>
   );
-});
+}
 
 const Backdrop = styled.a`
   animation: ${fadeIn} 250ms ease-in-out;
@@ -419,7 +430,7 @@ const Container = styled(Flex)<ContainerProps>`
         props.$collapsed ? `calc(100% - 8px)` : 0});
     }
 
-    ${(props: ContainerProps) => props.$isHovering && css(hoverStyles)}
+    ${(props: ContainerProps) => props.$isHovering && hoverStyles(props)}
 
     &:hover {
       ${ToggleButton} {

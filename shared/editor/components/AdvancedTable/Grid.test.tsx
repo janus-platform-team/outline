@@ -1,5 +1,6 @@
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
 import { ThemeProvider } from "styled-components";
 import { buildLightTheme } from "../../../styles/theme";
 import {
@@ -16,10 +17,11 @@ const describeDom = typeof document === "undefined" ? describe.skip : describe;
 
 describeDom("AdvancedTableGrid", () => {
   let container: HTMLDivElement;
+  let root: Root;
 
   const renderGrid = (data: AdvancedTableData, onChange = vi.fn()) => {
     act(() => {
-      ReactDOM.render(
+      root.render(
         <ThemeProvider theme={buildLightTheme({})}>
           <AdvancedTableGrid
             data={data}
@@ -27,8 +29,7 @@ describeDom("AdvancedTableGrid", () => {
             isSelected={false}
             onChange={onChange}
           />
-        </ThemeProvider>,
-        container
+        </ThemeProvider>
       );
     });
     return onChange;
@@ -39,6 +40,7 @@ describeDom("AdvancedTableGrid", () => {
   const sizeProps = ["offsetHeight", "offsetWidth"] as const;
 
   beforeAll(() => {
+    Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
     for (const prop of sizeProps) {
       Object.defineProperty(HTMLElement.prototype, prop, {
         configurable: true,
@@ -53,15 +55,17 @@ describeDom("AdvancedTableGrid", () => {
       Reflect.deleteProperty(HTMLElement.prototype, prop);
     }
     Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    Reflect.deleteProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT");
   });
 
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
+    root = createRoot(container);
   });
 
   afterEach(() => {
-    ReactDOM.unmountComponentAtNode(container);
+    act(() => root.unmount());
     container.remove();
   });
 

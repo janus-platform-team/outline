@@ -13,7 +13,7 @@ import {
   FileOperationType,
   ImportState,
 } from "@shared/types";
-import { toError } from "@shared/utils/error";
+import { errToId, toError } from "@shared/utils/error";
 import type RootStore from "~/stores/RootStore";
 import type Collection from "~/models/Collection";
 import type Comment from "~/models/Comment";
@@ -46,6 +46,12 @@ import { getVisibilityListener, getPageVisible } from "~/utils/pageVisibility";
 type SocketWithAuthentication = Socket & {
   authenticated?: boolean;
 };
+
+/** Identifiers of socket authentication errors that are expected in normal use. */
+const unreportableErrorIds = [
+  "authentication_required",
+  "invalid_authentication",
+];
 
 export const WebsocketContext = createContext<SocketWithAuthentication | null>(
   null
@@ -138,7 +144,10 @@ function useConnectionHandlers() {
 
       toast.error(message);
 
-      if (message === "No access token") {
+      // Authentication failures are an expected result of an expired or
+      // otherwise unusable token, there is nothing to report.
+      const errorId = errToId(err);
+      if (errorId && unreportableErrorIds.includes(errorId)) {
         return;
       }
 
@@ -302,7 +311,7 @@ function useDocumentHandlers() {
         }) => {
           const document = event.document;
 
-          // When document is detached as part of unpublishing, only the owner should be able to view it.
+          // Users that cannot see the draft only receive its ID, so it is removed.
           if (
             !document.collectionId &&
             document.createdBy?.id !== currentUserId
@@ -782,6 +791,10 @@ function useNotificationHandlers() {
         notifications.add(event);
       }
     );
+
+    socket.on("notifications.delete", (event: WebsocketEntityDeletedEvent) => {
+      notifications.remove(event.modelId);
+    });
 
     socket.on(
       "subscriptions.create",

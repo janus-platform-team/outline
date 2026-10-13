@@ -103,17 +103,13 @@ export default class AdvancedTable extends Node {
         ];
         const body: DOMOutputSpec = [
           "tbody",
-          ...data.rows.map(
-            (row): DOMOutputSpec => [
-              "tr",
-              ...columns.map(
-                (c): DOMOutputSpec => [
-                  "td",
-                  formatValue(row.cells[c.id] ?? null, c),
-                ]
-              ),
-            ]
-          ),
+          ...data.rows.map((row): DOMOutputSpec => [
+            "tr",
+            ...columns.map((c): DOMOutputSpec => [
+              "td",
+              formatValue(row.cells[c.id] ?? null, c),
+            ]),
+          ]),
         ];
 
         return [
@@ -133,10 +129,13 @@ export default class AdvancedTable extends Node {
   }
 
   handleChange =
-    ({ getPos }: { getPos: () => number }) =>
+    ({ getPos }: Pick<ComponentProps, "getPos">) =>
     (data: AdvancedTableData) => {
       const { view } = this.editor;
       const pos = getPos();
+      if (pos === undefined) {
+        return;
+      }
       const node = view.state.doc.nodeAt(pos);
       if (!node || node.type.name !== this.name) {
         return;
@@ -150,10 +149,14 @@ export default class AdvancedTable extends Node {
     };
 
   handleExit =
-    ({ getPos }: { getPos: () => number }) =>
+    ({ getPos }: Pick<ComponentProps, "getPos">) =>
     () => {
       const { view } = this.editor;
-      const $pos = view.state.doc.resolve(getPos());
+      const pos = getPos();
+      if (pos === undefined) {
+        return;
+      }
+      const $pos = view.state.doc.resolve(pos);
       view.dispatch(view.state.tr.setSelection(new NodeSelection($pos)));
       view.focus();
     };

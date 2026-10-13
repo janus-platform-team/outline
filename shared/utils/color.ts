@@ -1,5 +1,6 @@
-import md5 from "crypto-js/md5";
-import { darken, parseToHsl, parseToRgb } from "polished";
+import { md5 } from "@noble/hashes/legacy.js";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { darken, getLuminance, parseToHsl, parseToRgb } from "polished";
 import theme from "../styles/theme";
 import type { RgbaColor } from "polished/lib/types/color";
 
@@ -24,7 +25,7 @@ export const validateColorHex = (color: string) =>
   /^#(?:[0-9A-F]{3,4}|[0-9A-F]{6}|[0-9A-F]{8})$/i.test(color);
 
 export const stringToColor = (input: string) => {
-  const inputAsNumber = parseInt(md5(input).toString(), 16);
+  const inputAsNumber = parseInt(bytesToHex(md5(utf8ToBytes(input))), 16);
   return palette[inputAsNumber % palette.length];
 };
 
@@ -51,6 +52,33 @@ export const getTextColor = (background: string) => {
   return yiq >= 128 ? "black" : "white";
 };
 
+/**
+ * Returns the color when it is visible against the theme background, otherwise
+ * the fallback. Very dark colors are not visible in the dark theme and very
+ * light colors are not visible in the light theme.
+ *
+ * @param color - the color to check.
+ * @param isDark - whether the dark theme is active.
+ * @param fallback - the color to use when the color is missing or not visible.
+ * @returns the color or the fallback.
+ */
+export const ensureContrast = (
+  color: string | null | undefined,
+  isDark: boolean,
+  fallback = "currentColor"
+): string => {
+  if (!color) {
+    return fallback;
+  }
+  if (color === "currentColor") {
+    return color;
+  }
+
+  const luminance = getLuminance(color);
+  const isVisible = isDark ? luminance > 0.09 : luminance < 0.9;
+  return isVisible ? color : fallback;
+};
+
 const round = (
   number: number,
   digits = 0,
@@ -65,6 +93,42 @@ const toHex = (number: number) => {
 export const rgbaToHex = ({ red, green, blue, alpha }: RgbaColor): string => {
   const alphaHex = alpha < 1 ? toHex(round(alpha * 255)) : "";
   return "#" + toHex(red) + toHex(green) + toHex(blue) + alphaHex;
+};
+
+/**
+ * Converts a CSS color in any notation into hex notation.
+ *
+ * @param color - a color string in any notation understood by polished.
+ * @returns the color in hex notation, or null if it is not a color that can be
+ * parsed, or is fully transparent.
+ */
+export const toHexColor = (color: string): string | null => {
+  try {
+    const rgb = parseToRgb(color);
+    const alpha = "alpha" in rgb ? rgb.alpha : 1;
+    if (alpha === 0) {
+      return null;
+    }
+    return rgbaToHex({ ...rgb, alpha });
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Whether a color is close enough to white that it is likely a page or default
+ * background rather than deliberate styling.
+ *
+ * @param color - a color string in any notation understood by polished.
+ * @returns true if the color is near white.
+ */
+export const isNearWhite = (color: string): boolean => {
+  try {
+    const { red, green, blue } = parseToRgb(color);
+    return red > 250 && green > 250 && blue > 250;
+  } catch {
+    return false;
+  }
 };
 
 export interface ColorFormats {

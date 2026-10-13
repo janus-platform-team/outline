@@ -1,6 +1,6 @@
 /* global File Promise */
 import type { PluginSimple } from "markdown-it";
-import { observable } from "mobx";
+import { observable, runInAction } from "mobx";
 import { Observer } from "mobx-react";
 import { darken, transparentize } from "polished";
 import { baseKeymap } from "prosemirror-commands";
@@ -9,7 +9,11 @@ import { gapCursor } from "prosemirror-gapcursor";
 import type { InputRule } from "prosemirror-inputrules";
 import { keymap } from "prosemirror-keymap";
 import type { NodeSpec, MarkSpec } from "prosemirror-model";
-import { Schema, Node as ProsemirrorNode } from "prosemirror-model";
+import {
+  Schema,
+  Node as ProsemirrorNode,
+  DOMParser as ProsemirrorDOMParser,
+} from "prosemirror-model";
 import type { Plugin, Transaction } from "prosemirror-state";
 import { EditorState, Selection, TextSelection } from "prosemirror-state";
 import type { MarkdownParser } from "prosemirror-markdown";
@@ -22,7 +26,7 @@ import {
 import type { Decoration, NodeViewConstructor } from "prosemirror-view";
 import { EditorView } from "prosemirror-view";
 import * as React from "react";
-import type { DefaultTheme, ThemeProps } from "styled-components";
+import type { DefaultTheme } from "styled-components";
 import styled, { css } from "styled-components";
 import type { CommentAnchor } from "@shared/editor/commands/comment";
 import insertFiles from "@shared/editor/commands/insertFiles";
@@ -32,10 +36,12 @@ import type { EmbedDescriptor } from "@shared/editor/embeds";
 import type { CommandFactory, WidgetProps } from "@shared/editor/lib/Extension";
 import type { AnyExtension, AnyExtensionClass } from "@shared/editor/lib/types";
 import ExtensionManager from "@shared/editor/lib/ExtensionManager";
+import { EditorStyleHelper } from "@shared/editor/styles/EditorStyleHelper";
 import { inputRules } from "@shared/editor/lib/inputRules";
 import type { MarkdownSerializer } from "@shared/editor/lib/markdown/serializer";
 import { isRemoteTransaction } from "@shared/editor/lib/multiplayer";
 import textBetween from "@shared/editor/lib/textBetween";
+import { findNearestPos } from "@shared/editor/queries/findNearestPos";
 import { basicExtensions as extensions } from "@shared/editor/nodes";
 import type ReactNode from "@shared/editor/nodes/ReactNode";
 import type {
@@ -48,8 +54,12 @@ import type {
   ProsemirrorMark,
   UserPreferences,
 } from "@shared/types";
+import { HeadingPrefixStyle } from "@shared/types";
+import { headingPrefixPluginKey } from "@shared/editor/extensions/HeadingPrefix";
 import { ProsemirrorHelper } from "@shared/utils/ProsemirrorHelper";
 import EventEmitter from "@shared/utils/events";
+import { getDataTransferFiles } from "@shared/utils/files";
+import { AttachmentValidation } from "@shared/validations";
 import type Document from "~/models/Document";
 import Flex from "~/components/Flex";
 import { PortalContext } from "~/components/Portal";
@@ -175,6 +185,8 @@ export type Props = {
   embeds: EmbedDescriptor[];
   /** Display preferences for the logged in user, if any. */
   userPreferences?: UserPreferences | null;
+  /** The style of prefix displayed before headings in the document. */
+  headingPrefix?: HeadingPrefixStyle;
   /** Whether embeds should be rendered without an iframe */
   embedsDisabled?: boolean;
   className?: string;
@@ -202,7 +214,7 @@ type State = {
  * ~/components/Editor instead.
  */
 export class Editor extends React.PureComponent<
-  Props & ThemeProps<DefaultTheme>,
+  Props & { theme: DefaultTheme },
   State
 > {
   static defaultProps = {
@@ -235,9 +247,6 @@ export class Editor extends React.PureComponent<
   wrapperRef = React.createRef<HTMLDivElement>();
   view: EditorView;
   schema: Schema;
-  serializer: MarkdownSerializer;
-  parser: MarkdownParser;
-  pasteParser: MarkdownParser;
   plugins: Plugin[];
   keymaps: Plugin[];
   inputRules: InputRule[];
@@ -249,6 +258,9 @@ export class Editor extends React.PureComponent<
   nodeRenderers = observable.set<NodeViewRenderer<ComponentProps>>();
   decorationRenderers = observable.set<PortalRenderer>();
   private portalDestroyers = new WeakMap<HTMLElement, () => void>();
+  private cachedSerializer?: MarkdownSerializer;
+  private cachedParser?: MarkdownParser;
+  private cachedPasteParser?: MarkdownParser;
   nodes: { [name: string]: NodeSpec };
   marks: { [name: string]: MarkSpec };
   commands: Record<string, CommandFactory>;
@@ -258,11 +270,38 @@ export class Editor extends React.PureComponent<
   mutationObserver?: MutationObserver;
 
   /**
+   * The markdown serializer for the editor schema, created on first use.
+   */
+  public get serializer(): MarkdownSerializer {
+    this.cachedSerializer ??= this.createSerializer();
+    return this.cachedSerializer;
+  }
+
+  /**
+   * The markdown parser for the editor schema, created on first use.
+   */
+  public get parser(): MarkdownParser {
+    this.cachedParser ??= this.createParser();
+    return this.cachedParser;
+  }
+
+  /**
+   * The markdown parser used for pasted content, created on first use.
+   */
+  public get pasteParser(): MarkdownParser {
+    this.cachedPasteParser ??= this.props.readOnly
+      ? this.parser
+      : this.createPasteParser();
+    return this.cachedPasteParser;
+  }
+
+  /**
    * We use componentDidMount instead of constructor as the init method requires
    * that the dom is already mounted.
    */
   public componentDidMount() {
     this.init();
+    this.handleEditorInit();
     window.addEventListener("theme-changed", this.dispatchThemeChanged);
 
     if (this.props.scrollTo) {
@@ -285,6 +324,11 @@ export class Editor extends React.PureComponent<
     if (this.props.value && prevProps.value !== this.props.value) {
       const newState = this.createState(this.props.value);
       this.view.updateState(newState);
+
+      // Positions held by the lightbox refer to the previous document.
+      if (this.state.activeLightboxImage) {
+        this.updateActiveLightboxImage(null);
+      }
     }
 
     // When transitioning from readOnly to editable, reinitialize to create
@@ -311,6 +355,16 @@ export class Editor extends React.PureComponent<
 
     if (this.props.scrollTo && this.props.scrollTo !== prevProps.scrollTo) {
       void this.scrollToAnchor(this.props.scrollTo);
+    }
+
+    // Recompute heading prefix decorations when the display preference changes
+    if (this.props.headingPrefix !== prevProps.headingPrefix) {
+      this.view.dispatch(
+        this.view.state.tr.setMeta(
+          headingPrefixPluginKey,
+          this.props.headingPrefix ?? HeadingPrefixStyle.None
+        )
+      );
     }
 
     // Focus at the end of the document if switching from readOnly and autoFocus
@@ -348,8 +402,9 @@ export class Editor extends React.PureComponent<
     this.schema = this.createSchema();
     this.plugins = this.createPlugins();
     this.rulePlugins = this.createRulePlugins();
-    this.serializer = this.createSerializer();
-    this.parser = this.createParser();
+    this.cachedSerializer = undefined;
+    this.cachedParser = undefined;
+    this.cachedPasteParser = undefined;
     this.nodeViews = this.createNodeViews();
 
     this.widgets = this.createWidgets();
@@ -357,14 +412,14 @@ export class Editor extends React.PureComponent<
     if (this.props.readOnly) {
       this.keymaps = [];
       this.inputRules = [];
-      this.pasteParser = this.parser;
     } else {
       this.keymaps = this.createKeymaps();
       this.inputRules = this.createInputRules();
-      this.pasteParser = this.createPasteParser();
     }
 
-    this.view = this.createView();
+    // Node views register their renderers as they are created, batch them so
+    // that React renders them once.
+    this.view = runInAction(() => this.createView());
     this.commands = this.createCommands();
     this.selectionToolbarMenus = this.extensions.selectionToolbarMenus;
   }
@@ -402,7 +457,7 @@ export class Editor extends React.PureComponent<
           (
             node: ProsemirrorNode,
             view: EditorView,
-            getPos: () => number,
+            getPos: () => number | undefined,
             decorations: Decoration[]
           ) =>
             new ComponentView(extension.component, {
@@ -481,7 +536,9 @@ export class Editor extends React.PureComponent<
         ...this.keymaps,
         anchorPlugin(),
         dropCursor({
-          color: this.props.theme.cursor,
+          color: this.props.theme.accent,
+          width: 2,
+          class: EditorStyleHelper.dropCursor,
         }),
         gapCursor(),
         inputRules({
@@ -500,6 +557,10 @@ export class Editor extends React.PureComponent<
 
     // Looks like Markdown
     if (typeof content === "string") {
+      // An empty document needs no parsing, the state fills in the default.
+      if (!content) {
+        return undefined;
+      }
       return this.parser.parse(content) || undefined;
     }
 
@@ -547,7 +608,8 @@ export class Editor extends React.PureComponent<
         const { state, transactions } =
           this.state.applyTransaction(transaction);
 
-        this.updateState(state);
+        // Batch node view renderer changes so that React renders them once.
+        runInAction(() => this.updateState(state));
 
         // If any of the transactions being dispatched resulted in the doc
         // changing then call our own change handler to let the outside world
@@ -560,7 +622,7 @@ export class Editor extends React.PureComponent<
         ) {
           self.handleChange({
             remote: transactions.some(
-              (tr) => tr.docChanged && isRemoteTransaction(tr)
+              (tr) => tr.docChanged && isRemoteTransaction(tr, state)
             ),
           });
         }
@@ -582,6 +644,13 @@ export class Editor extends React.PureComponent<
     return view;
   }
 
+  /**
+   * Scroll the document to the element matching the given selector, waiting for
+   * it to be added to the DOM if it is not rendered yet.
+   *
+   * @param hash the selector to scroll to, typically a heading id prefixed
+   * with #.
+   */
   public async scrollToAnchor(hash: string) {
     if (!hash) {
       return;
@@ -641,13 +710,19 @@ export class Editor extends React.PureComponent<
   };
 
   private calculateDir = () => {
-    if (!this.elementRef.current) {
+    const element = this.elementRef.current;
+    if (!element) {
       return;
     }
 
+    // Prefer the closest dir attribute, computing the style forces a style
+    // recalculation of the whole document.
+    const dir = element.closest("[dir]")?.getAttribute("dir");
     const isRTL =
       this.props.dir === "rtl" ||
-      getComputedStyle(this.elementRef.current).direction === "rtl";
+      (dir === "auto" || !dir
+        ? getComputedStyle(element).direction === "rtl"
+        : dir === "rtl");
 
     if (this.state.isRTL !== isRTL) {
       this.setState({ isRTL });
@@ -723,6 +798,57 @@ export class Editor extends React.PureComponent<
       files,
       this.props
     );
+
+  /**
+   * Insert the content of a drop event at the position nearest to where it
+   * occurred. Intended for drops that land outside of the editor itself.
+   *
+   * @param event The drop event.
+   */
+  public insertDroppedContent = (event: React.DragEvent<HTMLElement>) => {
+    const { view } = this;
+    if (!view.editable) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const pos = findNearestPos(view, {
+      left: event.clientX,
+      top: event.clientY,
+    });
+    const files = getDataTransferFiles(event);
+
+    // Without files, attempt to parse the payload as an HTML fragment.
+    if (files.length === 0) {
+      const text =
+        event.dataTransfer.getData("text/html") ||
+        event.dataTransfer.getData("text/plain");
+      if (!text) {
+        return;
+      }
+
+      const dom = new DOMParser().parseFromString(text, "text/html");
+      view.dispatch(
+        view.state.tr.insert(
+          pos,
+          ProsemirrorDOMParser.fromSchema(view.state.schema).parse(dom)
+        )
+      );
+      return;
+    }
+
+    // Insert all files as attachments if any of the files are not images.
+    const isAttachment = files.some(
+      (file) => !AttachmentValidation.imageContentTypes.includes(file.type)
+    );
+
+    return insertFiles(view, event, pos, files, {
+      ...this.props,
+      isAttachment,
+    });
+  };
 
   /**
    * Returns true if the trimmed content of the editor is an empty string.
@@ -906,6 +1032,8 @@ export class Editor extends React.PureComponent<
   };
 
   private handleEditorDestroy = () => {
+    this.isInitialized = false;
+
     if (!this.props.onDestroy) {
       return;
     }
@@ -1010,6 +1138,8 @@ export class Editor extends React.PureComponent<
                   rtl={isRTL}
                   readOnly={readOnly}
                   selection={this.view.state.selection}
+                  storedMarks={this.view.state.storedMarks}
+                  isEditorFocused={this.state.isEditorFocused}
                 />
               ))}
             <Observer>
@@ -1037,7 +1167,7 @@ export class Editor extends React.PureComponent<
   }
 }
 
-const EditorContainer = styled(Styles)<{
+const StyledEditorContainer = styled(Styles)<{
   userId?: string;
   focusedCommentId?: string;
   hoveredCommentId?: string;
@@ -1054,8 +1184,8 @@ const EditorContainer = styled(Styles)<{
         }
       }
       a#comment-${props.focusedCommentId}
-        ~ span.component-image
-        div.image-wrapper {
+      ~ span.component-image
+      div.image-wrapper {
         outline: ${props.theme.commentedImageOutlineDark} solid 2px;
       }
     `}
@@ -1072,8 +1202,8 @@ const EditorContainer = styled(Styles)<{
         }
       }
       a#comment-${props.hoveredCommentId}
-        ~ span.component-image
-        div.image-wrapper {
+      ~ span.component-image
+      div.image-wrapper {
         outline: ${props.theme.commentedImageOutlineDark} solid 2px;
       }
     `}
@@ -1086,23 +1216,30 @@ const EditorContainer = styled(Styles)<{
         background: ${props.theme.textHighlight};
 
         &.ProseMirror-selectednode {
-          outline-color: ${props.readOnly
-            ? "transparent"
-            : darken(0.2, props.theme.textHighlight)};
+          outline-color: ${
+            props.readOnly
+              ? "transparent"
+              : darken(0.2, props.theme.textHighlight)
+          };
         }
       }
     `}
 `;
 
-const LazyLoadedEditor = React.forwardRef<Editor, Props>(
-  function LazyLoadedEditor_(props: Props, ref) {
-    return (
-      <WithTheme>
-        {(theme) => <Editor theme={theme} {...props} ref={ref} />}
-      </WithTheme>
-    );
-  }
-);
+// The editor re-renders on every transaction, memoize the container so that
+// its large stylesheet is not regenerated when the props have not changed.
+const EditorContainer = React.memo(StyledEditorContainer);
+
+function LazyLoadedEditor({
+  ref,
+  ...props
+}: Props & { ref?: React.Ref<Editor> }) {
+  return (
+    <WithTheme>
+      {(theme) => <Editor theme={theme} {...props} ref={ref} />}
+    </WithTheme>
+  );
+}
 
 const observe = (
   selector: string,

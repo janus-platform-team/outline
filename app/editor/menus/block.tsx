@@ -46,7 +46,7 @@ const Img = styled(Image)`
 
 export default function blockMenuItems(
   t: TFunction,
-  documentRef: React.RefObject<HTMLDivElement>
+  documentRef: React.RefObject<HTMLDivElement | null>
 ): MenuItem[] {
   const documentWidth = documentRef.current?.clientWidth ?? 0;
 
@@ -54,7 +54,7 @@ export default function blockMenuItems(
     {
       name: "heading",
       title: t("Big heading"),
-      keywords: "h1 heading1 title",
+      keywords: "h1 heading1 title header",
       icon: <Heading1Icon />,
       shortcut: "^ ⇧ 1",
       attrs: { level: 1 },
@@ -62,7 +62,7 @@ export default function blockMenuItems(
     {
       name: "heading",
       title: t("Medium heading"),
-      keywords: "h2 heading2",
+      keywords: "h2 heading2 header subtitle",
       icon: <Heading2Icon />,
       shortcut: "^ ⇧ 2",
       attrs: { level: 2 },
@@ -70,7 +70,7 @@ export default function blockMenuItems(
     {
       name: "heading",
       title: t("Small heading"),
-      keywords: "h3 heading3",
+      keywords: "h3 heading3 header",
       icon: <Heading3Icon />,
       shortcut: "^ ⇧ 3",
       attrs: { level: 3 },
@@ -78,7 +78,7 @@ export default function blockMenuItems(
     {
       name: "heading",
       title: t("Extra small heading"),
-      keywords: "h4 heading4",
+      keywords: "h4 heading4 header",
       icon: <Heading4Icon />,
       shortcut: "^ ⇧ 4",
       attrs: { level: 4 },
@@ -97,12 +97,14 @@ export default function blockMenuItems(
       name: "bullet_list",
       title: t("Bulleted list"),
       icon: <BulletedListIcon />,
+      keywords: "unordered dash point",
       shortcut: "^ ⇧ 8",
     },
     {
       name: "ordered_list",
       title: t("Ordered list"),
       icon: <OrderedListIcon />,
+      keywords: "ol numbered",
       shortcut: "^ ⇧ 9",
     },
     {
@@ -112,19 +114,19 @@ export default function blockMenuItems(
       name: "image",
       title: t("Image"),
       icon: <ImageIcon />,
-      keywords: "picture photo",
+      keywords: "picture photo img upload png jpg screenshot",
     },
     {
       name: "video",
       title: t("Video"),
       icon: <EmbedIcon />,
-      keywords: "mov avi upload player",
+      keywords: "movie avi mp4 film upload player",
     },
     {
       name: "attachment",
       title: t("Embed PDF"),
       icon: <PDFIcon />,
-      keywords: "pdf upload attach",
+      keywords: "document upload attach",
       attrs: {
         accept: "application/pdf",
         preview: true,
@@ -134,12 +136,13 @@ export default function blockMenuItems(
       name: "attachment",
       title: t("File attachment"),
       icon: <AttachmentIcon />,
-      keywords: "file upload attach",
+      keywords: "upload attach",
     },
     {
       name: "table",
       title: t("Table"),
       icon: <TableIcon />,
+      keywords: "grid spreadsheet rows columns cells",
       attrs: {
         rowsCount: 3,
         colsCount: 3,
@@ -150,7 +153,7 @@ export default function blockMenuItems(
       name: "blockquote",
       title: t("Quote"),
       icon: <BlockQuoteIcon />,
-      keywords: "blockquote pullquote",
+      keywords: "blockquote pullquote citation",
       shortcut: `${metaDisplay} ]`,
     },
     {
@@ -158,26 +161,26 @@ export default function blockMenuItems(
       title: t("Code block"),
       icon: <CodeIcon />,
       shortcut: "^ ⇧ c",
-      keywords: "script",
+      keywords: "script snippet syntax pre",
     },
     {
       name: "math_block",
       title: t("Math block (LaTeX)"),
       icon: <MathIcon />,
-      keywords: "math katex latex",
+      keywords: "katex formula equation",
     },
     {
       name: "hr",
       title: t("Divider"),
       icon: <HorizontalRuleIcon />,
       shortcut: `${metaDisplay} _`,
-      keywords: "horizontal rule break line",
+      keywords: "horizontal rule break line separator",
     },
     {
       name: "hr",
       title: t("Page break"),
       icon: <PageBreakIcon />,
-      keywords: "page print break line",
+      keywords: "pagebreak print line",
       attrs: { markup: "***" },
     },
     {
@@ -185,7 +188,7 @@ export default function blockMenuItems(
       // date/time" commands that inserted a static string or template token.
       name: "mention",
       title: t("Current date"),
-      keywords: "clock today date time now",
+      keywords: "clock today time now",
       icon: <CalendarIcon />,
       appendSpace: true,
       attrs: () => {
@@ -205,34 +208,34 @@ export default function blockMenuItems(
       name: "container_toggle",
       title: t("Toggle block"),
       icon: <CollapseIcon />,
-      keywords: "toggle collapsible collapse fold",
+      keywords: "collapsible collapse fold accordion details expand",
     },
     {
       name: "container_toggle",
       title: t("Big toggle heading"),
       icon: <Heading1Icon />,
-      keywords: "toggle collapsible collapse fold heading h1",
+      keywords: "collapsible collapse fold accordion details expand h1",
       attrs: { level: 1 },
     },
     {
       name: "container_toggle",
       title: t("Medium toggle heading"),
       icon: <Heading2Icon />,
-      keywords: "toggle collapsible collapse fold heading h2",
+      keywords: "collapsible collapse fold accordion details expand h2",
       attrs: { level: 2 },
     },
     {
       name: "container_toggle",
       title: t("Small toggle heading"),
       icon: <Heading3Icon />,
-      keywords: "toggle collapsible collapse fold heading h3",
+      keywords: "collapsible collapse fold accordion details expand h3",
       attrs: { level: 3 },
     },
     {
       name: "container_toggle",
       title: t("Extra small toggle heading"),
       icon: <Heading4Icon />,
-      keywords: "toggle collapsible collapse fold heading h4",
+      keywords: "collapsible collapse fold accordion details expand h4",
       attrs: { level: 4 },
     },
     {
@@ -242,28 +245,28 @@ export default function blockMenuItems(
       name: "container_notice",
       title: t("Info notice"),
       icon: <InfoIcon />,
-      keywords: "notice card information",
+      keywords: "card callout hint information note",
       attrs: { style: "info" },
     },
     {
       name: "container_notice",
       title: t("Success notice"),
       icon: <DoneIcon />,
-      keywords: "notice card success",
+      keywords: "card callout hint",
       attrs: { style: "success" },
     },
     {
       name: "container_notice",
       title: t("Warning notice"),
       icon: <WarningIcon />,
-      keywords: "notice card error",
+      keywords: "card callout hint error caution danger alert",
       attrs: { style: "warning" },
     },
     {
       name: "container_notice",
       title: t("Tip notice"),
       icon: <StarredIcon />,
-      keywords: "notice card suggestion",
+      keywords: "card callout hint suggestion",
       attrs: { style: "tip" },
     },
     {
@@ -273,14 +276,14 @@ export default function blockMenuItems(
       name: "code_block",
       title: "Mermaid Diagram",
       icon: <Img src="/images/mermaidjs.png" alt="Mermaid Diagram" />,
-      keywords: "diagram flowchart",
+      keywords: "flowchart graph sequence gantt",
       attrs: { language: "mermaid" },
     },
     {
       name: "editDiagram",
       title: "Diagrams.net Diagram",
       icon: <Img src="/images/diagrams.png" alt="Diagrams.net Diagram" />,
-      keywords: "diagram flowchart draw.io",
+      keywords: "flowchart drawio draw.io whiteboard",
     },
   ];
 
