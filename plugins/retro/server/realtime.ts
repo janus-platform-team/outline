@@ -9,7 +9,7 @@ let emitter: Emitter | undefined;
 
 function getEmitter() {
   if (!emitter) {
-    emitter = new Emitter(Redis.defaultClient).of("/realtime");
+    emitter = new Emitter(Redis.defaultClient);
   }
   return emitter;
 }
