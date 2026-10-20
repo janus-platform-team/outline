@@ -43,4 +43,36 @@ describe("PluginManager", () => {
       "test-settings-plugin-low",
     ]);
   });
+
+  it("returns registered route and sidebar item hooks", () => {
+    PluginManager.add([
+      {
+        id: "test-route-plugin",
+        name: "Route plugin",
+        type: Hook.Route,
+        value: {
+          path: "/test-route",
+          exact: true,
+          component,
+        },
+      },
+      {
+        id: "test-sidebar-plugin",
+        name: "Sidebar plugin",
+        type: Hook.SidebarItem,
+        value: {
+          to: "/test-route",
+          label: "Test",
+          icon: Icon,
+        },
+      },
+    ]);
+
+    expect(
+      PluginManager.getHook(Hook.Route, "test-route-plugin")?.value.path
+    ).toEqual("/test-route");
+    expect(
+      PluginManager.getHook(Hook.SidebarItem, "test-sidebar-plugin")?.value.to
+    ).toEqual("/test-route");
+  });
 });

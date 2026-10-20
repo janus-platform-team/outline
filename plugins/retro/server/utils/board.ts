@@ -21,22 +21,21 @@ export async function loadRetroBoard(
   retro: Retro,
   transaction?: Transaction
 ): Promise<RetroBoard> {
-  const [cards, votes, actionItems] = await Promise.all([
-    RetroCard.findAll({
-      where: { retroId: retro.id },
-      order: [["createdAt", "ASC"]],
-      transaction,
-    }),
-    RetroVote.findAll({
-      where: { retroId: retro.id },
-      transaction,
-    }),
-    RetroActionItem.findAll({
-      where: { retroId: retro.id },
-      order: [["createdAt", "ASC"]],
-      transaction,
-    }),
-  ]);
+  // Queries run sequentially as a transaction holds a single connection.
+  const cards = await RetroCard.findAll({
+    where: { retroId: retro.id },
+    order: [["createdAt", "ASC"]],
+    transaction,
+  });
+  const votes = await RetroVote.findAll({
+    where: { retroId: retro.id },
+    transaction,
+  });
+  const actionItems = await RetroActionItem.findAll({
+    where: { retroId: retro.id },
+    order: [["createdAt", "ASC"]],
+    transaction,
+  });
 
   return { retro, cards, votes, actionItems };
 }
