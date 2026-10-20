@@ -252,21 +252,25 @@ function RetroScene() {
       <PhaseBar phase={board.phase} />
       <PhaseHint>
         {board.phase === RetroPhase.Brainstorm &&
-          (board.hiddenCardCount > 0
+          (board.hiddenCardCount === 1
             ? t(
-                "Add your cards. {{ count }} cards from others are hidden until brainstorming ends.",
-                { count: board.hiddenCardCount }
+                "Add your cards. 1 card from others is hidden until brainstorming ends."
               )
-            : t(
-                "Add your cards. Cards from others are hidden until brainstorming ends."
-              ))}
+            : board.hiddenCardCount > 1
+              ? t(
+                  "Add your cards. {{ count }} cards from others are hidden until brainstorming ends.",
+                  { count: board.hiddenCardCount }
+                )
+              : t(
+                  "Add your cards. Cards from others are hidden until brainstorming ends."
+                ))}
         {board.phase === RetroPhase.Vote &&
-          t(
-            "Vote for the cards you want to discuss. {{ count }} votes remaining.",
-            {
-              count: board.votesRemaining,
-            }
-          )}
+          (board.votesRemaining === 1
+            ? t("Vote for the cards you want to discuss. 1 vote remaining.")
+            : t(
+                "Vote for the cards you want to discuss. {{ count }} votes remaining.",
+                { count: board.votesRemaining }
+              ))}
         {board.phase === RetroPhase.Discuss &&
           t("Cards are sorted by votes. Record action items below.")}
         {isClosed && board.documentId && (
