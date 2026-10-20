@@ -1,0 +1,6 @@
+{
+  "id": "retro",
+  "name": "Retrospectives",
+  "priority": 50,
+  "description": "Adds retrospective boards with anonymous brainstorming, voting and action items."
+}

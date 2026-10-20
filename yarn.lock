@@ -5887,6 +5887,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@socket.io/redis-emitter@npm:^5.1.0":
+  version: 5.1.0
+  resolution: "@socket.io/redis-emitter@npm:5.1.0"
+  dependencies:
+    debug: "npm:~4.3.1"
+    notepack.io: "npm:~3.0.1"
+    socket.io-parser: "npm:~4.2.1"
+  checksum: 10c0/57b5eb1d0372cc7f75cee27e5bf4eabd75cc81983a115749c14354ea432d9fa8170f43c723187687c5bd2a2560c1b658824f3226af3e6eb418e70a31dd1b56e4
+  languageName: node
+  linkType: hard
+
 "@standard-schema/spec@npm:^1.1.0":
   version: 1.1.0
   resolution: "@standard-schema/spec@npm:1.1.0"
@@ -15465,6 +15476,7 @@ __metadata:
     "@simplewebauthn/browser": "npm:^13.3.0"
     "@simplewebauthn/server": "npm:^13.3.3"
     "@socket.io/redis-adapter": "npm:^8.3.0"
+    "@socket.io/redis-emitter": "npm:^5.1.0"
     "@swc/cli": "npm:^0.8.1"
     "@swc/core": "npm:^1.15.32"
     "@tanstack/react-table": "npm:^8.21.3"
@@ -18655,7 +18667,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"socket.io-parser@npm:~4.2.4":
+"socket.io-parser@npm:~4.2.1, socket.io-parser@npm:~4.2.4":
   version: 4.2.7
   resolution: "socket.io-parser@npm:4.2.7"
   dependencies:
