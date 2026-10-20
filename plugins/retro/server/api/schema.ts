@@ -38,9 +38,7 @@ export const RetrosCreateSchema = BaseSchema.extend({
 
     /** Column titles, defaults are used when omitted. */
     columns: z
-      .array(
-        z.string().trim().min(1).max(RetroValidation.maxColumnTitleLength)
-      )
+      .array(z.string().trim().min(1).max(RetroValidation.maxColumnTitleLength))
       .min(1)
       .max(RetroValidation.maxColumns)
       .optional(),

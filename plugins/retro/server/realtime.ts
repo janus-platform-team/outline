@@ -28,6 +28,9 @@ export function emitRetroUpdate(teamId: string, retroId: string) {
   try {
     getEmitter().to(`team-${teamId}.members`).emit(RetroUpdateEvent, payload);
   } catch (err) {
-    Logger.error("Failed to emit retro update", toError(err), { teamId, retroId });
+    Logger.error("Failed to emit retro update", toError(err), {
+      teamId,
+      retroId,
+    });
   }
 }
