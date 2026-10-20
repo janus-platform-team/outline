@@ -16,6 +16,7 @@ import useQueryNotices from "~/hooks/useQueryNotices";
 import useKeyboardShortcutsQuery from "~/hooks/useKeyboardShortcutsQuery";
 import lazy from "@shared/utils/lazyWithRetry";
 import * as Scenes from "./scenes";
+import { usePluginRoutes } from "./usePluginRoutes";
 import {
   archivePath,
   draftsPath,
@@ -55,6 +56,7 @@ function AuthenticatedRoutes() {
   const team = useCurrentTeam();
   const can = usePolicy(team);
   const history = useHistory();
+  const pluginRoutes = usePluginRoutes();
 
   // Warm the editor chunks alongside the scene chunk so a document can render
   // as soon as its data arrives.
@@ -166,6 +168,7 @@ function AuthenticatedRoutes() {
                 />
               )}
               <Route exact path="/404" component={Error404} />
+              {pluginRoutes}
               <SettingsRoutes />
               <Route component={Error404} />
             </Switch>

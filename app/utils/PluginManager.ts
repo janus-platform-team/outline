@@ -15,6 +15,8 @@ export enum Hook {
   Settings = "settings",
   Imports = "imports",
   Icon = "icon",
+  Route = "route",
+  SidebarItem = "sidebarItem",
 }
 
 /**
@@ -46,6 +48,28 @@ type PluginValueMap = {
     action: React.ReactElement;
   };
   [Hook.Icon]: React.ElementType;
+  [Hook.Route]: {
+    /** The path, or paths, the route matches. */
+    path: string | string[];
+    /** The lazy loaded component rendered for the route. */
+    component: LazyComponent<React.ComponentType>;
+    /** Whether the path must match exactly. */
+    exact?: boolean;
+    /** Whether the route is enabled in the current context. */
+    enabled?: (team: Team, user: User) => boolean;
+  };
+  [Hook.SidebarItem]: {
+    /** The path the sidebar item links to. */
+    to: string;
+    /** The displayed label of the sidebar item. */
+    label: string;
+    /** The displayed icon of the sidebar item. */
+    icon: React.ElementType;
+    /** An optional lazy component to preload when the item is hovered. */
+    preload?: () => Promise<unknown>;
+    /** Whether the sidebar item is enabled in the current context. */
+    enabled?: (team: Team, user: User) => boolean;
+  };
 };
 
 export type Plugin<T extends Hook> = {
