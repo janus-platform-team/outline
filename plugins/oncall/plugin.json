@@ -1,0 +1,6 @@
+{
+  "id": "oncall",
+  "name": "On-call",
+  "priority": 50,
+  "description": "Adds on-call calendars with rotations, overrides and Slack shift notifications that can be embedded in documents."
+}
