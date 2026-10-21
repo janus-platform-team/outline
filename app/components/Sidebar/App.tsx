@@ -32,6 +32,7 @@ import { DraftsLink } from "./components/DraftsLink";
 import DragPlaceholder from "./components/DragPlaceholder";
 import { DismissableSidebarAction } from "./components/DismissableSidebarAction";
 import HistoryNavigation from "./components/HistoryNavigation";
+import { PluginLinks } from "./components/PluginLinks";
 import Section from "./components/Section";
 import SharedWithMe from "./components/SharedWithMe";
 import SidebarButton from "./components/SidebarButton";
@@ -132,6 +133,7 @@ function AppSidebar() {
               onClickIntent={Scenes.Search.preload}
             />
             {can.createDocument && <DraftsLink />}
+            <PluginLinks />
           </Section>
         </Overflow>
         <Scrollable flex shadow ref={setScrollArea}>
