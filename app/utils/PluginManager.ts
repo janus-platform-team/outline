@@ -1,6 +1,7 @@
 import { isArray, sortBy } from "es-toolkit/compat";
 import { action, makeObservable, observable, runInAction } from "mobx";
 import type { IObservableArray } from "mobx";
+import type { EmbedDescriptor } from "@shared/editor/embeds";
 import type Team from "~/models/Team";
 import type User from "~/models/User";
 import type { LazyComponent } from "~/components/LazyLoad";
@@ -17,6 +18,7 @@ export enum Hook {
   Icon = "icon",
   Route = "route",
   SidebarItem = "sidebarItem",
+  Embed = "embed",
 }
 
 /**
@@ -70,6 +72,7 @@ type PluginValueMap = {
     /** Whether the sidebar item is enabled in the current context. */
     enabled?: (team: Team, user: User) => boolean;
   };
+  [Hook.Embed]: EmbedDescriptor;
 };
 
 export type Plugin<T extends Hook> = {

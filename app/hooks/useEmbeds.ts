@@ -5,11 +5,14 @@ import embeds from "@shared/editor/embeds";
 import { IntegrationType, TeamPreference } from "@shared/types";
 import type Integration from "~/models/Integration";
 import Logger from "~/utils/Logger";
+import { Hook, PluginManager } from "~/utils/PluginManager";
+import { useComputed } from "./useComputed";
 import useCurrentTeam from "./useCurrentTeam";
 import useStores from "./useStores";
 
 /**
- * Hook to get all embed configuration for the current team
+ * Hook to get all embed configuration for the current team, including embeds
+ * registered by plugins.
  *
  * @param loadIfMissing Should we load integration settings if they are not locally available
  * @returns A list of embed descriptors
@@ -17,6 +20,10 @@ import useStores from "./useStores";
 export default function useEmbeds(loadIfMissing = false) {
   const { integrations } = useStores();
   const team = useCurrentTeam({ rejectOnEmpty: false });
+  const pluginEmbeds = useComputed(
+    () => PluginManager.getHooks(Hook.Embed).map((hook) => hook.value),
+    []
+  );
 
   useEffect(() => {
     async function fetchEmbedIntegrations() {
@@ -39,7 +46,7 @@ export default function useEmbeds(loadIfMissing = false) {
 
   return useMemo(
     () =>
-      embeds.map((e) => {
+      [...embeds, ...pluginEmbeds].map((e) => {
         // Find any integrations that match this embed and inject the settings
         const integration: Integration<IntegrationType.Embed> | undefined =
           find(integrations.orderedData, (i) => i.service === e.name);
@@ -53,6 +60,6 @@ export default function useEmbeds(loadIfMissing = false) {
         return e;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [integrations.orderedData, team?.preferences]
+    [integrations.orderedData, team?.preferences, pluginEmbeds]
   );
 }
