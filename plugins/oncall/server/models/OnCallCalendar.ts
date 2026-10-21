@@ -46,8 +46,8 @@ class OnCallCalendar extends ParanoidModel<
   @Column(DataType.INTEGER)
   notifyHour: number;
 
-  @Encrypted
   @Column(DataType.BLOB)
+  @Encrypted
   slackWebhookUrl: string | null;
 
   // associations

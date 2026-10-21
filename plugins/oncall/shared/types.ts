@@ -57,6 +57,74 @@ export type MembershipChange =
     }
   | { type: "remove"; userId: string };
 
+/** An override as returned by the API. */
+export interface OnCallOverrideData {
+  id: string;
+  rotationId: string;
+  userId: string;
+  startDate: DateString;
+  endDate: DateString;
+  reason: string | null;
+  createdById: string;
+}
+
+/** A rotation as returned by the API. */
+export interface OnCallRotationData {
+  id: string;
+  calendarId: string;
+  name: string;
+  color: string;
+  startDate: DateString;
+  startDayOfWeek: number;
+  shiftLengthDays: number;
+  notifyOnChange: boolean;
+  index: number;
+  /** All segments of the rotation, ordered by effective date. */
+  segments: RotationSegment[];
+  /** The members in effect today, or on the first day if not started yet. */
+  memberIds: string[];
+  /** The shift in progress today, including overrides. */
+  currentShift: ScheduleShift | null;
+  /** Overrides that end today or later. */
+  overrides: OnCallOverrideData[];
+}
+
+/** A calendar as returned by the API. */
+export interface OnCallCalendarData {
+  id: string;
+  name: string;
+  description: string | null;
+  timezone: string;
+  notifyHour: number;
+  /** Whether a Slack webhook is configured. The URL itself is never returned. */
+  slackConfigured: boolean;
+  createdById: string;
+  /** The current date in the calendar's timezone. */
+  today: DateString;
+  createdAt: string;
+  updatedAt: string;
+  rotations: OnCallRotationData[];
+}
+
+/** The resolved schedule of a calendar for a date range. */
+export interface OnCallScheduleData {
+  calendarId: string;
+  startDate: DateString;
+  endDate: DateString;
+  rotations: { rotationId: string; shifts: ScheduleShift[] }[];
+  overrides: OnCallOverrideData[];
+}
+
+/** The result of adding or removing a member of a rotation. */
+export interface OnCallMembershipResult {
+  /** The shift boundary the change takes effect from. */
+  effectiveDate: DateString;
+  /** The upcoming shifts from the effective date. */
+  preview: ScheduleShift[];
+  /** The updated rotation, omitted when previewing. */
+  rotation?: OnCallRotationData;
+}
+
 /** The socket event emitted to team members when a calendar changes. */
 export const OnCallUpdateEvent = "oncall.update";
 
