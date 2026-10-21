@@ -259,7 +259,12 @@ describe("#oncallRotations.update", () => {
     const b = await buildUser({ teamId: owner.teamId });
     const calendar = await createCalendar(owner);
     const rotation = await createRotation(owner, calendar.id, [owner.id, b.id]);
-    const before = await getSchedule(owner, calendar.id, addDays(today, -14), today);
+    const before = await getSchedule(
+      owner,
+      calendar.id,
+      addDays(today, -14),
+      today
+    );
 
     const res = await server.post("/api/oncallRotations.update", owner, {
       body: { id: rotation.id, shiftLengthDays: 1 },
@@ -270,7 +275,12 @@ describe("#oncallRotations.update", () => {
     expect(body.data.segments).toHaveLength(2);
     expect(body.data.segments[1].effectiveDate).toEqual(addDays(today, 7));
 
-    const after = await getSchedule(owner, calendar.id, addDays(today, -14), today);
+    const after = await getSchedule(
+      owner,
+      calendar.id,
+      addDays(today, -14),
+      today
+    );
     expect(after.rotations).toEqual(before.rotations);
   });
 });
@@ -296,9 +306,14 @@ describe("#oncallRotations.addMember", () => {
     expect(res.status).toEqual(200);
     expect(body.data.effectiveDate).toEqual(addDays(today, 7));
     expect(body.data.rotation.segments).toHaveLength(2);
-    expect(body.data.preview.map((s: { userId: string }) => s.userId)).toEqual(
-      [b.id, c.id, owner.id, b.id, c.id, owner.id]
-    );
+    expect(body.data.preview.map((s: { userId: string }) => s.userId)).toEqual([
+      b.id,
+      c.id,
+      owner.id,
+      b.id,
+      c.id,
+      owner.id,
+    ]);
 
     const after = await getSchedule(
       owner,
@@ -340,7 +355,11 @@ describe("#oncallRotations.addMember", () => {
     const rotation = await createRotation(owner, calendar.id, [owner.id]);
 
     const res = await server.post("/api/oncallRotations.addMember", owner, {
-      body: { id: rotation.id, userId: b.id, effectiveDate: addDays(today, -1) },
+      body: {
+        id: rotation.id,
+        userId: b.id,
+        effectiveDate: addDays(today, -1),
+      },
     });
     expect(res.status).toEqual(400);
   });
@@ -426,7 +445,11 @@ describe("#oncallOverrides.create", () => {
         userId: b.id,
         overrideId: override.id,
       },
-      { startDate: addDays(today, 3), endDate: addDays(today, 3), userId: owner.id },
+      {
+        startDate: addDays(today, 3),
+        endDate: addDays(today, 3),
+        userId: owner.id,
+      },
     ]);
     expect(schedule.overrides).toHaveLength(1);
   });
@@ -448,7 +471,11 @@ describe("#oncallOverrides.create", () => {
     expect(first.status).toEqual(200);
 
     const second = await server.post("/api/oncallOverrides.create", owner, {
-      body: { ...body, startDate: addDays(today, 3), endDate: addDays(today, 4) },
+      body: {
+        ...body,
+        startDate: addDays(today, 3),
+        endDate: addDays(today, 4),
+      },
     });
     expect(second.status).toEqual(400);
   });

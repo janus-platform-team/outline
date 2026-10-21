@@ -50,7 +50,12 @@ describe("resolveRotationUser", () => {
 
   it("respects the start index", () => {
     const segments: RotationSegment[] = [
-      { effectiveDate: start, memberIds: ["a", "b"], startIndex: 1, shiftLengthDays: 7 },
+      {
+        effectiveDate: start,
+        memberIds: ["a", "b"],
+        startIndex: 1,
+        shiftLengthDays: 7,
+      },
     ];
     expect(usersFrom(segments, start, 3, 7)).toEqual(["b", "a", "b"]);
   });
@@ -67,7 +72,12 @@ describe("getShiftRange", () => {
   it("cuts a shift short at the next segment", () => {
     const segments: RotationSegment[] = [
       ...weekly(["a", "b"]),
-      { effectiveDate: "2026-10-23", memberIds: ["a", "b"], startIndex: 1, shiftLengthDays: 7 },
+      {
+        effectiveDate: "2026-10-23",
+        memberIds: ["a", "b"],
+        startIndex: 1,
+        shiftLengthDays: 7,
+      },
     ];
     expect(getShiftRange(segments, "2026-10-21")?.endDate).toEqual(
       "2026-10-22"
@@ -204,7 +214,12 @@ describe("applyMembershipChange", () => {
     expect(
       applyMembershipChange([], { type: "add", userId: "a" }, start, 3)
     ).toEqual([
-      { effectiveDate: start, memberIds: ["a"], startIndex: 0, shiftLengthDays: 3 },
+      {
+        effectiveDate: start,
+        memberIds: ["a"],
+        startIndex: 0,
+        shiftLengthDays: 3,
+      },
     ]);
   });
 
@@ -259,7 +274,12 @@ describe("reanchorRotation", () => {
   it("moves the start of a rotation", () => {
     const after = reanchorRotation(weekly(["a", "b"]), "2026-10-21", 2);
     expect(after).toEqual([
-      { effectiveDate: "2026-10-21", memberIds: ["a", "b"], startIndex: 0, shiftLengthDays: 2 },
+      {
+        effectiveDate: "2026-10-21",
+        memberIds: ["a", "b"],
+        startIndex: 0,
+        shiftLengthDays: 2,
+      },
     ]);
   });
 });
@@ -289,7 +309,12 @@ describe("overrides", () => {
     );
     expect(groupShifts(days)).toEqual([
       { startDate: "2026-10-21", endDate: "2026-10-21", userId: "a" },
-      { startDate: "2026-10-22", endDate: "2026-10-23", userId: "z", overrideId: "o1" },
+      {
+        startDate: "2026-10-22",
+        endDate: "2026-10-23",
+        userId: "z",
+        overrideId: "o1",
+      },
       { startDate: "2026-10-24", endDate: "2026-10-25", userId: "a" },
       { startDate: "2026-10-26", endDate: "2026-10-26", userId: "b" },
     ]);

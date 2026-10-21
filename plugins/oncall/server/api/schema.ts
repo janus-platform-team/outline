@@ -11,7 +11,9 @@ const description = z
   .max(OnCallValidation.maxDescriptionLength)
   .nullish();
 
-const date = z.string().refine(isValidDate, "must be a date in the form YYYY-MM-DD");
+const date = z
+  .string()
+  .refine(isValidDate, "must be a date in the form YYYY-MM-DD");
 
 const timezone = z.string().refine(isValidTimeZone, "must be a valid timezone");
 
@@ -189,11 +191,7 @@ export const OnCallOverridesCreateSchema = BaseSchema.extend({
       userId: z.uuid(),
       startDate: date,
       endDate: date,
-      reason: z
-        .string()
-        .trim()
-        .max(OnCallValidation.maxReasonLength)
-        .nullish(),
+      reason: z.string().trim().max(OnCallValidation.maxReasonLength).nullish(),
     })
     .refine((body) => body.startDate <= body.endDate, {
       message: "endDate must be on or after startDate",

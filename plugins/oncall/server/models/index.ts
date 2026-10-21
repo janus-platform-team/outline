@@ -15,4 +15,9 @@ if (!sequelize.isDefined("oncall_calendar")) {
   ]);
 }
 
-export { OnCallCalendar, OnCallOverride, OnCallRotation, OnCallRotationSegment };
+export {
+  OnCallCalendar,
+  OnCallOverride,
+  OnCallRotation,
+  OnCallRotationSegment,
+};

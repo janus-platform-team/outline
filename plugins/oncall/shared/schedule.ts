@@ -329,7 +329,11 @@ export function applyScheduleChange(
     result.push({ ...segment, effectiveDate, shiftLengthDays });
   }
 
-  return rebuildStartIndexes(result, boundary, before.length ? undefined : base);
+  return rebuildStartIndexes(
+    result,
+    boundary,
+    before.length ? undefined : base
+  );
 }
 
 /**
@@ -376,8 +380,7 @@ export function previewShifts(
     return shifts;
   }
 
-  let date =
-    from < sorted[0].effectiveDate ? sorted[0].effectiveDate : from;
+  let date = from < sorted[0].effectiveDate ? sorted[0].effectiveDate : from;
   while (shifts.length < count) {
     const range = getShiftRange(sorted, date);
     if (!range) {

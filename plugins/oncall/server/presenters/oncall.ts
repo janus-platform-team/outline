@@ -12,11 +12,7 @@ import type {
   OnCallRotationData,
   ScheduleShift,
 } from "../../shared/types";
-import type {
-  OnCallCalendar,
-  OnCallOverride,
-  OnCallRotation,
-} from "../models";
+import type { OnCallCalendar, OnCallOverride, OnCallRotation } from "../models";
 
 /** The number of days either side of today searched for the current shift. */
 const currentShiftWindow = 60;
@@ -114,8 +110,6 @@ function getCurrentShift(
       addDays(today, currentShiftWindow)
     )
   );
-  const shift = shifts.find(
-    (s) => s.startDate <= today && s.endDate >= today
-  );
+  const shift = shifts.find((s) => s.startDate <= today && s.endDate >= today);
   return shift?.userId ? shift : null;
 }

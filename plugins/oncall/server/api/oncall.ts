@@ -34,11 +34,7 @@ import type {
   RotationSegment,
 } from "../../shared/types";
 import { OnCallValidation, RotationColors } from "../../shared/types";
-import {
-  OnCallCalendar,
-  OnCallOverride,
-  OnCallRotation,
-} from "../models";
+import { OnCallCalendar, OnCallOverride, OnCallRotation } from "../models";
 import {
   presentCalendar,
   presentOverride,
